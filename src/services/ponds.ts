@@ -9,6 +9,7 @@ export interface Pond {
   pond_spec?: string;
   fry_date?: string;
   picture_url?: string; // Added field
+  is_demo?: boolean;
 }
 
 export const getPondList = async (params: any = {}) => {

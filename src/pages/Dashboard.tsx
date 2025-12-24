@@ -108,8 +108,14 @@ const Dashboard = () => {
       const pondListPromise = getPondList({ page: 1, page_size: 100 });
       const groupPondsPromise = getGroupPondsData();
 
-      // 1. 处理自有塘口（通常较快）
-      pondListPromise.then((res: any) => {
+      // 等待所有请求完成
+      const [pondListResult, groupPondsResult] = await Promise.allSettled([pondListPromise, groupPondsPromise]);
+      
+      let newPonds: Pond[] = [];
+      
+      // 1. 处理自有塘口
+      if (pondListResult.status === 'fulfilled') {
+        const res = pondListResult.value;
         let list: Pond[] = [];
         if (Array.isArray(res)) {
           list = res;
@@ -124,39 +130,40 @@ const Dashboard = () => {
         } else if (res && Array.isArray(res.ponds)) {
           list = res.ponds;
         }
-        
-        setPonds(prev => {
-          // 合并当前已有的（可能是缓存的）和新的自有塘口
-          // 这里策略是：优先使用新的自有列表，保留已有的群组数据（如果有）
-          // 但由于我们不知道哪些是群组数据，简单做法是：先显示自有数据，后续群组数据回来了再合并
-          // 或者更稳妥：合并并去重
-          const merged = [...prev, ...list];
-          const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
-          return unique;
-        });
-        
-        // 至少有数据了，取消 loading
-        setLoading(false);
-      }).catch(err => console.error('Failed to fetch owned ponds', err));
+        newPonds = [...newPonds, ...list];
+      } else {
+        console.error('Failed to fetch owned ponds', pondListResult.reason);
+        // 如果失败，尝试从缓存中恢复自有部分（如果需要的话，但这里我们希望刷新）
+      }
 
-      // 2. 处理群组塘口（较慢）
-      groupPondsPromise.then((groupPonds) => {
-        setPonds(prev => {
-           const merged = [...prev, ...groupPonds];
-           const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
-           
-           // 更新缓存
-           localStorage.setItem('cached_ponds_data', JSON.stringify({
-             timestamp: Date.now(),
-             ponds: unique
-           }));
-           
-           return unique;
-        });
-      }).catch(err => console.error('Failed to fetch group ponds', err));
+      // 2. 处理群组塘口
+      if (groupPondsResult.status === 'fulfilled') {
+        const groupPonds = groupPondsResult.value;
+        if (Array.isArray(groupPonds)) {
+             newPonds = [...newPonds, ...groupPonds];
+        }
+      } else {
+         console.error('Failed to fetch group ponds', groupPondsResult.reason);
+      }
+
+      // 去重
+      let unique = Array.from(new Map(newPonds.map(item => [item.id, item])).values());
       
-      // 等待所有完成（可选，用于某些清理工作，这里不需要）
-      await Promise.allSettled([pondListPromise, groupPondsPromise]);
+      // 排序：示例塘口（is_demo=true）置顶
+      unique.sort((a, b) => {
+        if (a.is_demo && !b.is_demo) return -1;
+        if (!a.is_demo && b.is_demo) return 1;
+        return 0;
+      });
+      
+      // 更新状态
+      setPonds(unique);
+      
+      // 更新缓存
+      localStorage.setItem('cached_ponds_data', JSON.stringify({
+         timestamp: Date.now(),
+         ponds: unique
+      }));
 
     } catch (err) {
       console.error(err);
