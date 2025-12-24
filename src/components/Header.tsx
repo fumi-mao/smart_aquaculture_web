@@ -1,0 +1,50 @@
+import { useUserStore } from '@/store/useUserStore';
+import { LogOut, User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+const Header = () => {
+  const { user, logout } = useUserStore();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  return (
+    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 fixed top-0 left-0 right-0 z-50">
+      <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+        {user?.avatar_url ? (
+            <img src={user.avatar_url} alt="Logo" className="w-8 h-8 rounded-full shadow-sm object-cover" />
+        ) : (
+            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white shadow-sm">
+               <span className="text-xs font-bold">虾</span>
+            </div>
+        )}
+        <span className="text-blue-600 font-bold text-xl">{user?.nickname || '智能养虾'}</span>
+      </div>
+      
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-gray-600 text-sm">
+             {user?.avatar_url ? (
+                <img src={user.avatar_url} alt="User" className="w-6 h-6 rounded-full object-cover" />
+             ) : (
+                <User size={16} />
+             )}
+            <span>{user?.nickname || '用户'}</span>
+          </div>
+          <button 
+            onClick={handleLogout}
+            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs flex items-center gap-1 transition-colors"
+          >
+            <LogOut size={12} />
+            退出登录
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+export default Header;
