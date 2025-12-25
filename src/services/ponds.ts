@@ -7,10 +7,17 @@ export interface Pond {
   max_depth: number;
   breed_type: string;
   breed_species: string;
-  pond_spec?: string;
-  fry_date?: string;
-  picture_url?: string;
-  is_demo?: boolean;
+  province: string;
+  city: string;
+  district: string;
+  longitude: number;
+  latitude: number;
+  user_remark: string;
+  picture_url: string;
+  created_at: string;
+  updated_at: string;
+  group_id: number;
+  is_demo: boolean;
 }
 
 export const getPondList = async (params: any = {}) => {

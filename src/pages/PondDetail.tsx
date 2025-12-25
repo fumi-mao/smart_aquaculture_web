@@ -1,16 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Calendar, Download } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { Pond, getPondDetail } from '@/services/ponds';
+import { GroupInfo, getGroupInfo, GroupUser } from '@/services/groups';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-// Extended interfaces
-interface PondStaff {
-  id: number;
-  name: string;
-  avatar: string;
-}
-
+// FarmingRecord interface for the timeline (keeping it for structure, though data might be empty)
 interface FarmingRecord {
   id: number;
   time: string;
@@ -18,13 +13,10 @@ interface FarmingRecord {
   image?: string;
 }
 
-interface PondDetailInfo extends Omit<Pond, 'max_depth'> {
-  location?: string;
-  max_depth?: number | string;
-  breed_mode?: string;
-  remark?: string;
-  staffs?: PondStaff[];
+// Extend Pond to include extra info needed for the view
+interface PondDetailInfo extends Pond {
   records?: FarmingRecord[];
+  groupInfo?: GroupInfo;
 }
 
 const PondDetail = () => {
@@ -36,24 +28,39 @@ const PondDetail = () => {
   useEffect(() => {
     if (id) {
        setLoading(true);
-       getPondDetail(id).then((data: any) => {
-         // Map response to PondDetailInfo, providing defaults for missing fields
-         setPond({
-            ...data,
-            location: data.location || '-', 
-            max_depth: data.max_depth || '-',
-            breed_mode: data.breed_mode || '-',
-            remark: data.remark || '',
-            staffs: data.staffs || [],
-            records: data.records || []
-         });
-       }).catch(err => {
-         console.error(err);
-       }).finally(() => {
-         setLoading(false);
-       });
+       const fetchData = async () => {
+         try {
+           // Fetch Pond Detail
+           const pondRes = await getPondDetail(id);
+           const pondData = pondRes.data;
+
+           let groupData = null;
+           if (pondData.group_id) {
+             // Fetch Group Info using group_id from pond details
+             const groupRes = await getGroupInfo(pondData.group_id);
+             groupData = groupRes.data;
+           }
+           
+           setPond({
+             ...pondData,
+             records: [], // Placeholder as no API provided for records in this task
+             groupInfo: groupData
+           });
+         } catch (err) {
+           console.error('Error fetching pond details:', err);
+         } finally {
+           setLoading(false);
+         }
+       };
+       fetchData();
     }
   }, [id]);
+
+  const getRoleName = (user: GroupUser, ownerId: number) => {
+    if (user.id === ownerId) return '创建者';
+    if (user.admin) return '管理员';
+    return '观众';
+  };
 
   if (loading || !pond) return <div className="flex h-full items-center justify-center">Loading...</div>;
 
@@ -70,6 +77,18 @@ const PondDetail = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Column: Farming Records (Timeline) */}
         <div className="w-72 border-r border-gray-200 flex flex-col h-full bg-white shrink-0">
+           {/* Pond Avatar Area */}
+           <div className="p-4 border-b border-gray-100 flex flex-col items-center">
+             <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-100 mb-2 shadow-sm">
+               {pond.picture_url ? (
+                 <img src={pond.picture_url} alt={pond.name} className="w-full h-full object-cover" />
+               ) : (
+                 <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400">无图</div>
+               )}
+             </div>
+             <h3 className="font-bold text-gray-900">{pond.name}</h3>
+           </div>
+
            <div className="p-4 pb-2">
              <h3 className="font-bold text-gray-900 text-lg">养殖记录</h3>
            </div>
@@ -115,8 +134,7 @@ const PondDetail = () => {
            </div>
 
            <div className="flex justify-between items-center mb-6 z-10">
-              <h2 className="text-2xl font-bold text-gray-900">超势图</h2>
-              {/* Optional: Date Range Picker or Controls could go here */}
+              <h2 className="text-2xl font-bold text-gray-900">趋势图</h2>
            </div>
 
            <div className="flex-1 w-full min-h-0 z-10">
@@ -143,15 +161,28 @@ const PondDetail = () => {
            <div className="mb-8">
               <h3 className="font-bold text-gray-900 mb-4 text-lg">塘口人员</h3>
               <div className="grid grid-cols-4 gap-2">
-                 {pond.staffs && pond.staffs.map((staff) => (
-                   <div key={staff.id} className="flex flex-col items-center">
-                      <div className="w-10 h-10 border border-gray-800 rounded-sm overflow-hidden mb-1">
-                        <img src={staff.avatar} className="w-full h-full object-cover" />
-                      </div>
-                      <span className="text-xs font-medium text-gray-700">{staff.name}</span>
-                   </div>
-                 ))}
-                 {(!pond.staffs || pond.staffs.length === 0) && <div className="text-gray-400 text-sm">暂无人员</div>}
+                 {pond.groupInfo && pond.groupInfo.user_ids ? (
+                   pond.groupInfo.user_ids.map((user) => (
+                     <div key={user.id} className="flex flex-col items-center text-center group relative">
+                        <div className="w-10 h-10 border border-gray-200 rounded-full overflow-hidden mb-1">
+                          {user.avatar_url ? (
+                            <img src={user.avatar_url} alt={user.nickname} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">
+                              {user.nickname.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-xs font-medium text-gray-700 truncate w-full">{user.nickname}</span>
+                        <span className="text-[10px] text-gray-500 scale-90">
+                          {getRoleName(user, pond.groupInfo!.group_owner_id)}
+                        </span>
+                        {/* Tooltip for phone number if needed, but not in user object currently */}
+                     </div>
+                   ))
+                 ) : (
+                   <div className="text-gray-400 text-sm col-span-4">暂无人员</div>
+                 )}
               </div>
            </div>
 
@@ -169,7 +200,7 @@ const PondDetail = () => {
                  </div>
                  <div className="flex">
                    <span className="text-gray-500 w-20 shrink-0">位置 :</span>
-                   <span className="text-gray-900 font-medium">{pond.location}</span>
+                   <span className="text-gray-900 font-medium">{pond.province}{pond.city}{pond.district}</span>
                  </div>
                  <div className="flex">
                    <span className="text-gray-500 w-20 shrink-0">养殖面积 :</span>
@@ -177,15 +208,15 @@ const PondDetail = () => {
                  </div>
                  <div className="flex">
                    <span className="text-gray-500 w-20 shrink-0">最大水深 :</span>
-                   <span className="text-gray-900 font-medium">{pond.max_depth}</span>
+                   <span className="text-gray-900 font-medium">{pond.max_depth}米</span>
                  </div>
                  <div className="flex">
                    <span className="text-gray-500 w-20 shrink-0">养殖方式 :</span>
-                   <span className="text-gray-900 font-medium">{pond.breed_mode}</span>
+                   <span className="text-gray-900 font-medium">{pond.breed_type}</span>
                  </div>
                  <div className="flex">
                    <span className="text-gray-500 w-20 shrink-0">备注 :</span>
-                   <span className="text-gray-900 font-medium">{pond.remark}</span>
+                   <span className="text-gray-900 font-medium">{pond.user_remark || '-'}</span>
                  </div>
               </div>
            </div>
