@@ -178,30 +178,30 @@ const Dashboard = () => {
                   onClick={() => navigate(`/pond/${pond.id}`)}
                 >
                   {/* Card Header */}
-                  <div className="flex justify-between items-center px-6 py-6 border-b border-gray-100">
-                    <h3 className="font-bold text-gray-900 text-2xl truncate pr-2">{pond.name}</h3>
+                  <div className="flex justify-between items-center px-5 py-3 border-b border-gray-100">
+                    <h3 className="font-bold text-gray-900 text-xl truncate pr-2">{pond.name}</h3>
                     {pond.is_demo && (
-                      <span className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-500 shrink-0">
+                      <span className="px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-500 shrink-0">
                         示例
                       </span>
                     )}
                   </div>
                   
                   {/* Card Body */}
-                  <div className="flex p-10 gap-10">
+                  <div className="flex p-4 gap-4">
                     {/* Pond Image */}
-                    <div className="w-48 h-48 shrink-0 bg-gray-100 rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                    <div className="w-32 h-32 shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 shadow-sm">
                        {pond.picture_url ? (
                           <img src={pond.picture_url} alt={pond.name} className="w-full h-full object-cover" />
                        ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <img src="/favicon.svg" alt={pond.name} className="w-16 h-16 opacity-20" />
+                            <img src="/favicon.svg" alt={pond.name} className="w-12 h-12 opacity-20" />
                           </div>
                        )}
                     </div>
                     
                     {/* Metrics (Simulated Charts) */}
-                    <div className="flex-1 flex flex-col justify-between py-2 min-w-0 gap-8">
+                    <div className="flex-1 flex flex-col justify-between py-0.5 min-w-0 gap-2">
                         {/* pH */}
                         <div>
                            <div className="flex justify-between text-xs text-gray-500 mb-1">
@@ -237,15 +237,15 @@ const Dashboard = () => {
 
                   {/* Footer Info */}
                   <div className="grid grid-cols-3 border-t border-gray-100 text-xs text-gray-600 divide-x divide-gray-100 bg-gray-50/50">
-                     <div className="p-4 text-center truncate flex flex-col items-center justify-center gap-1">
+                     <div className="p-3 text-center truncate flex flex-col items-center justify-center gap-1">
                         <span className="text-gray-400 scale-90">塘口面积</span>
                         <span className="font-bold text-gray-900 text-sm">{pond.breed_area ? `${pond.breed_area}亩` : '-'}</span>
                      </div>
-                     <div className="p-4 text-center truncate flex flex-col items-center justify-center gap-1">
+                     <div className="p-3 text-center truncate flex flex-col items-center justify-center gap-1">
                         <span className="text-gray-400 scale-90">最大水深</span>
                         <span className="font-bold text-gray-900 text-sm">{pond.max_depth ? `${pond.max_depth}m` : '-'}</span>
                      </div>
-                     <div className="p-4 text-center truncate flex flex-col items-center justify-center gap-1">
+                     <div className="p-3 text-center truncate flex flex-col items-center justify-center gap-1">
                         <span className="text-gray-400 scale-90">养殖品种</span>
                         <span className="font-bold text-gray-900 text-sm truncate w-full px-1">{pond.breed_species || '-'}</span>
                      </div>

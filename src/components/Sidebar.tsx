@@ -1,21 +1,20 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
-  Fish, 
-  ClipboardList, 
-  LineChart, 
-  Bot, 
   Bell, 
-  Settings 
+  Settings,
+  FileDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+/**
+ * 侧边栏菜单配置
+ * 根据需求移除：塘口管理、养殖记录、数据分析、AI助手
+ * 新增：数据导出
+ */
 const menuItems = [
   { icon: LayoutDashboard, label: '首页', path: '/' },
-  { icon: Fish, label: '塘口管理', path: '/ponds' },
-  { icon: ClipboardList, label: '养殖记录', path: '/records' },
-  { icon: LineChart, label: '数据分析', path: '/analysis' },
-  { icon: Bot, label: 'AI 助手', path: '/ai-chat' },
+  { icon: FileDown, label: '数据导出', path: '/data-export' },
   { icon: Bell, label: '提醒事项', path: '/reminders' },
   { icon: Settings, label: '个人中心', path: '/profile' },
 ];

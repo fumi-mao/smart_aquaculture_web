@@ -31,7 +31,7 @@ const Header = () => {
   };
 
   return (
-    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 fixed top-0 left-0 right-0 z-50">
+    <header className="h-14 bg-white border-b-4 border-[#38393c] flex items-center justify-between px-4 fixed top-0 left-0 right-0 z-50">
       <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
         {user?.avatar_url ? (
             <img src={user.avatar_url} alt="Logo" className="w-8 h-8 rounded-full shadow-sm object-cover" />
