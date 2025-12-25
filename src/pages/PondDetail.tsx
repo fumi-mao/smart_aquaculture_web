@@ -18,9 +18,9 @@ interface FarmingRecord {
   image?: string;
 }
 
-interface PondDetailInfo extends Pond {
+interface PondDetailInfo extends Omit<Pond, 'max_depth'> {
   location?: string;
-  max_depth?: string;
+  max_depth?: number | string;
   breed_mode?: string;
   remark?: string;
   staffs?: PondStaff[];
@@ -173,7 +173,7 @@ const PondDetail = () => {
                  </div>
                  <div className="flex">
                    <span className="text-gray-500 w-20 shrink-0">养殖面积 :</span>
-                   <span className="text-gray-900 font-medium">{pond.surface_area}亩</span>
+                   <span className="text-gray-900 font-medium">{pond.breed_area}亩</span>
                  </div>
                  <div className="flex">
                    <span className="text-gray-500 w-20 shrink-0">最大水深 :</span>

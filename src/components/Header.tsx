@@ -1,10 +1,29 @@
+import { useEffect } from 'react';
 import { useUserStore } from '@/store/useUserStore';
 import { LogOut, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getUserInfo } from '@/services/users';
 
 const Header = () => {
-  const { user, logout } = useUserStore();
+  const { user, logout, setUser } = useUserStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      if (user?.user_id) {
+        try {
+          const res = await getUserInfo(user.user_id);
+          if (res && res.data) {
+             setUser({ ...user, ...res.data });
+          }
+        } catch (error) {
+          console.error('Failed to fetch user info:', error);
+        }
+      }
+    };
+    
+    fetchUserInfo();
+  }, [user?.user_id]);
 
   const handleLogout = () => {
     logout();

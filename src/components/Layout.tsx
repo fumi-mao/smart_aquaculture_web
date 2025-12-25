@@ -1,5 +1,6 @@
 import React from 'react';
 import Header from './Header';
+import Sidebar from './Sidebar';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -7,11 +8,14 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f0f5f9] to-[#dbeafe] pt-14">
+    <div className="h-screen bg-[#f0f5f9] flex flex-col">
       <Header />
-      <main className="h-[calc(100vh-3.5rem)] overflow-hidden">
-        {children}
-      </main>
+      <div className="flex flex-1 overflow-hidden pt-14">
+        <Sidebar />
+        <main className="flex-1 overflow-hidden relative">
+          {children}
+        </main>
+      </div>
     </div>
   );
 };

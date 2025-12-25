@@ -3,12 +3,13 @@ import api from './api';
 export interface Pond {
   id: number;
   name: string;
-  surface_area: number; // Was breed_area
+  breed_area: number;
+  max_depth: number;
   breed_type: string;
   breed_species: string;
   pond_spec?: string;
   fry_date?: string;
-  picture_url?: string; // Added field
+  picture_url?: string;
   is_demo?: boolean;
 }
 

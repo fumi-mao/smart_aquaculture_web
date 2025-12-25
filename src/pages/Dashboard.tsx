@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getPondList, getPondDetail, Pond } from '@/services/ponds';
 import { getGroupsList } from '@/services/groups';
-import { Loader2, MapPin, Fish, Clock, Bell } from 'lucide-react';
+import { Loader2, Fish, ArrowDownToLine, Maximize2, Droplets, Thermometer, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
@@ -14,8 +14,7 @@ const Dashboard = () => {
     const cached = localStorage.getItem('cached_ponds_data');
     if (cached) {
       try {
-        const { ponds: cachedPonds, timestamp } = JSON.parse(cached);
-        // 如果缓存不过期（例如1小时），可以完全信任，这里简单起见，总是先显示缓存
+        const { ponds: cachedPonds } = JSON.parse(cached);
         if (Array.isArray(cachedPonds)) {
           setPonds(cachedPonds);
           setLoading(false);
@@ -30,7 +29,6 @@ const Dashboard = () => {
 
   const fetchAllGroups = async () => {
     try {
-      // 1. Fetch page 1
       const res1: any = await getGroupsList({ page: 1, page_size: 50 });
       const data1 = res1?.data || res1;
       
@@ -38,21 +36,17 @@ const Dashboard = () => {
       
       let allGroups = Array.isArray(data1.groups) ? data1.groups : [];
       
-      // 2. Determine total pages
       let totalPages = 1;
       if (data1.total_pages) {
           totalPages = data1.total_pages;
       } else if (data1.page_info?.total_pages) {
           totalPages = data1.page_info.total_pages;
       } else {
-         // Fallback logic
-         if (allGroups.length >= 50) totalPages = 2; // Assume at least one more page
+         if (allGroups.length >= 50) totalPages = 2;
       }
 
-      // 3. Fetch remaining pages in parallel
       if (totalPages > 1) {
           const promises = [];
-          // Safety limit MAX_PAGES to avoid too many requests
           const MAX_PAGES = 20; 
           const limit = Math.min(totalPages, MAX_PAGES);
           
@@ -99,21 +93,17 @@ const Dashboard = () => {
   };
 
   const fetchPonds = async () => {
-    // 不再显示全局 loading，除非没有缓存
     const cached = localStorage.getItem('cached_ponds_data');
     if (!cached) setLoading(true);
 
     try {
-      // 启动并行请求，但独立处理结果
       const pondListPromise = getPondList({ page: 1, page_size: 100 });
       const groupPondsPromise = getGroupPondsData();
 
-      // 等待所有请求完成
       const [pondListResult, groupPondsResult] = await Promise.allSettled([pondListPromise, groupPondsPromise]);
       
       let newPonds: Pond[] = [];
       
-      // 1. 处理自有塘口
       if (pondListResult.status === 'fulfilled') {
         const res = pondListResult.value;
         let list: Pond[] = [];
@@ -133,10 +123,8 @@ const Dashboard = () => {
         newPonds = [...newPonds, ...list];
       } else {
         console.error('Failed to fetch owned ponds', pondListResult.reason);
-        // 如果失败，尝试从缓存中恢复自有部分（如果需要的话，但这里我们希望刷新）
       }
 
-      // 2. 处理群组塘口
       if (groupPondsResult.status === 'fulfilled') {
         const groupPonds = groupPondsResult.value;
         if (Array.isArray(groupPonds)) {
@@ -146,20 +134,16 @@ const Dashboard = () => {
          console.error('Failed to fetch group ponds', groupPondsResult.reason);
       }
 
-      // 去重
       let unique = Array.from(new Map(newPonds.map(item => [item.id, item])).values());
       
-      // 排序：示例塘口（is_demo=true）置顶
       unique.sort((a, b) => {
         if (a.is_demo && !b.is_demo) return -1;
         if (!a.is_demo && b.is_demo) return 1;
         return 0;
       });
       
-      // 更新状态
       setPonds(unique);
       
-      // 更新缓存
       localStorage.setItem('cached_ponds_data', JSON.stringify({
          timestamp: Date.now(),
          ponds: unique
@@ -174,85 +158,103 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="flex h-full">
-      {/* Sidebar removed as requested */}
+    <div className="flex flex-col h-full bg-transparent">
+      <div className="flex-none px-8 py-6">
+        <h1 className="text-2xl font-bold text-gray-900">我的鱼塘</h1>
+        <p className="text-gray-500 text-sm mt-1">管理和监控您的所有养殖塘口状态</p>
+      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-transparent">
-        <div className="h-12 bg-white border-b border-gray-200 flex items-center px-6 gap-8 shadow-sm z-10">
-           <button className="h-full border-b-2 border-blue-500 text-blue-600 font-bold text-sm px-1">
-             鱼塘({ponds.length})
-           </button>
-           <button className="h-full border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm px-1 font-medium transition-colors">
-             数据导出
-           </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-           {loading ? (
-             <div className="flex justify-center py-20">
-               <Loader2 className="animate-spin text-blue-500 w-8 h-8" />
-             </div>
-           ) : (
-             <div className="grid grid-cols-2 gap-6">
-                {ponds.map(pond => (
-                  <div key={pond.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={() => navigate(`/pond/${pond.id}`)}>
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="font-bold text-lg text-gray-900 group-hover:text-blue-600 transition-colors">{pond.name}</h3>
-                      <div className="text-xs text-gray-500 flex flex-col items-end gap-1 font-medium">
-                         <span className="bg-gray-50 px-2 py-0.5 rounded text-gray-600 border border-gray-100">{pond.pond_spec || '规格未知'}</span>
-                         <span className="text-gray-400">投放: {pond.fry_date || '-'}</span>
-                      </div>
+      <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar">
+         {loading ? (
+           <div className="flex justify-center py-20">
+             <Loader2 className="animate-spin text-blue-500 w-8 h-8" />
+           </div>
+         ) : (
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {ponds.map(pond => (
+                <div 
+                  key={pond.id} 
+                  className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer group flex flex-col" 
+                  onClick={() => navigate(`/pond/${pond.id}`)}
+                >
+                  {/* Card Header */}
+                  <div className="flex justify-between items-center px-6 py-6 border-b border-gray-100">
+                    <h3 className="font-bold text-gray-900 text-2xl truncate pr-2">{pond.name}</h3>
+                    {pond.is_demo && (
+                      <span className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-500 shrink-0">
+                        示例
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Card Body */}
+                  <div className="flex p-10 gap-10">
+                    {/* Pond Image */}
+                    <div className="w-48 h-48 shrink-0 bg-gray-100 rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                       {pond.picture_url ? (
+                          <img src={pond.picture_url} alt={pond.name} className="w-full h-full object-cover" />
+                       ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <img src="/favicon.svg" alt={pond.name} className="w-16 h-16 opacity-20" />
+                          </div>
+                       )}
                     </div>
                     
-                    <div className="flex gap-5 mb-4">
-                      {/* Left: Pond Avatar */}
-                      <div className="w-32 h-32 shrink-0 bg-gray-100 rounded-lg border border-gray-200 overflow-hidden relative">
-                         {pond.picture_url ? (
-                            <img src={pond.picture_url} alt={pond.name} className="w-full h-full object-cover" />
-                         ) : (
-                            <img src="/favicon.svg" alt={pond.name} className="w-full h-full object-cover p-4 opacity-50" />
-                         )}
-                      </div>
-                      
-                      {/* Right: Metrics */}
-                      <div className="flex-1 flex flex-col justify-center py-1">
-                         <div className="space-y-4">
-                           <div>
-                             <div className="flex justify-between text-xs mb-1.5">
-                               <span className="text-gray-500 font-medium">pH</span>
-                               <span className="text-gray-900 font-bold">7.8</span>
-                             </div>
-                             <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                               <div className="h-full bg-red-400 w-3/4 rounded-full"></div>
-                             </div>
+                    {/* Metrics (Simulated Charts) */}
+                    <div className="flex-1 flex flex-col justify-between py-2 min-w-0 gap-8">
+                        {/* pH */}
+                        <div>
+                           <div className="flex justify-between text-xs text-gray-500 mb-1">
+                             <span className="font-medium">pH</span>
+                             <span className="font-bold text-gray-900">7.8</span>
                            </div>
-                           <div>
-                             <div className="flex justify-between text-xs mb-1.5">
-                               <span className="text-gray-500 font-medium">亚盐</span>
-                               <span className="text-gray-900 font-bold">0.02</span>
-                             </div>
-                             <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                               <div className="h-full bg-yellow-400 w-1/4 rounded-full"></div>
-                             </div>
+                           <div className="h-1.5 bg-orange-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-orange-400 w-3/4 rounded-full"></div>
                            </div>
-                           <div>
-                             <div className="flex justify-between text-xs mb-1.5">
-                               <span className="text-gray-500 font-medium">氨氮</span>
-                               <span className="text-gray-900 font-bold">0.05</span>
-                             </div>
-                             <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                               <div className="h-full bg-green-500 w-1/5 rounded-full"></div>
-                             </div>
+                        </div>
+                        {/* Nitrite */}
+                        <div>
+                           <div className="flex justify-between text-xs text-gray-500 mb-1">
+                             <span className="font-medium">亚盐</span>
+                             <span className="font-bold text-gray-900">0.02</span>
                            </div>
-                         </div>
-                      </div>
+                           <div className="h-1.5 bg-red-100 rounded-full overflow-hidden">
+                               <div className="h-full bg-red-400 w-1/4 rounded-full"></div>
+                           </div>
+                        </div>
+                        {/* Ammonia */}
+                        <div>
+                           <div className="flex justify-between text-xs text-gray-500 mb-1">
+                             <span className="font-medium">氨氮</span>
+                             <span className="font-bold text-gray-900">0.05</span>
+                           </div>
+                           <div className="h-1.5 bg-teal-100 rounded-full overflow-hidden">
+                               <div className="h-full bg-teal-500 w-1/5 rounded-full"></div>
+                           </div>
+                        </div>
                     </div>
                   </div>
-                ))}
-             </div>
-           )}
-        </div>
+
+                  {/* Footer Info */}
+                  <div className="grid grid-cols-3 border-t border-gray-100 text-xs text-gray-600 divide-x divide-gray-100 bg-gray-50/50">
+                     <div className="p-4 text-center truncate flex flex-col items-center justify-center gap-1">
+                        <span className="text-gray-400 scale-90">塘口面积</span>
+                        <span className="font-bold text-gray-900 text-sm">{pond.breed_area ? `${pond.breed_area}亩` : '-'}</span>
+                     </div>
+                     <div className="p-4 text-center truncate flex flex-col items-center justify-center gap-1">
+                        <span className="text-gray-400 scale-90">最大水深</span>
+                        <span className="font-bold text-gray-900 text-sm">{pond.max_depth ? `${pond.max_depth}m` : '-'}</span>
+                     </div>
+                     <div className="p-4 text-center truncate flex flex-col items-center justify-center gap-1">
+                        <span className="text-gray-400 scale-90">养殖品种</span>
+                        <span className="font-bold text-gray-900 text-sm truncate w-full px-1">{pond.breed_species || '-'}</span>
+                     </div>
+                  </div>
+
+                </div>
+              ))}
+           </div>
+         )}
       </div>
     </div>
   );
