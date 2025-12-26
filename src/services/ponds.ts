@@ -37,3 +37,18 @@ export const getBreedingRecords = async (pondId: number | string, page: number =
   });
   return response.data;
 };
+
+/**
+ * 获取趋势图数据
+ * @param params 查询参数
+ * @returns 趋势图数据
+ */
+export const getTrendData = async (params: {
+  start_time: string;
+  end_time: string;
+  pond_id: number;
+  type: string[];
+}) => {
+  const response = await api.post('/query/timeline', params);
+  return response.data;
+};

@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
-import { Pond, getPondDetail, getBreedingRecords } from '@/services/ponds';
+import { Pond, getPondDetail, getBreedingRecords, getTrendData } from '@/services/ponds';
 import { GroupInfo, getGroupInfo, GroupUser } from '@/services/groups';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { subDays, startOfDay, endOfDay, format } from 'date-fns';
+import CustomDatePicker from '@/components/CustomDatePicker';
+import TrendChart from '@/components/TrendChart';
 import { 
   getRecordTypeChineseName, 
   getFullDisplayItems, 
@@ -85,9 +88,35 @@ const PondDetail = () => {
   const [pond, setPond] = useState<PondDetailInfo | null>(null);
   const [loading, setLoading] = useState(false);
   
+  // Trend Chart State
+  const [trendData, setTrendData] = useState<any[]>([]);
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [dateRange, setDateRange] = useState({
+    startDate: startOfDay(subDays(new Date(), 6)), // Last 7 days including today
+    endDate: endOfDay(new Date())
+  });
+
   // Sidebar visibility states
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
+  const leftLockRef = useRef(false);
+  const rightLockRef = useRef(false);
+  const handleToggleLeft = useCallback(() => {
+    if (leftLockRef.current) return;
+    leftLockRef.current = true;
+    setShowLeftPanel(prev => !prev);
+    setTimeout(() => {
+      leftLockRef.current = false;
+    }, 320);
+  }, [setShowLeftPanel]);
+  const handleToggleRight = useCallback(() => {
+    if (rightLockRef.current) return;
+    rightLockRef.current = true;
+    setShowRightPanel(prev => !prev);
+    setTimeout(() => {
+      rightLockRef.current = false;
+    }, 320);
+  }, [setShowRightPanel]);
 
   useEffect(() => {
     if (id) {
@@ -157,6 +186,32 @@ const PondDetail = () => {
        fetchData();
     }
   }, [id]);
+
+  // Fetch Trend Data when id or dateRange changes
+  useEffect(() => {
+    if (id && dateRange.startDate && dateRange.endDate) {
+      setTrendLoading(true);
+      const fetchTrend = async () => {
+        try {
+          const params = {
+            start_time: format(dateRange.startDate, 'yyyy-MM-dd HH:mm:ss'),
+            end_time: format(dateRange.endDate, 'yyyy-MM-dd HH:mm:ss'),
+            pond_id: parseInt(id),
+            type: ['waterquality_data']
+          };
+          const res = await getTrendData(params);
+          const data = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
+          setTrendData(data);
+        } catch (err) {
+          console.error('Error fetching trend data:', err);
+          setTrendData([]);
+        } finally {
+          setTrendLoading(false);
+        }
+      };
+      fetchTrend();
+    }
+  }, [id, dateRange]);
 
   const getRoleName = (user: GroupUser, ownerId: number) => {
     if (user.id === ownerId) return '创建者';
@@ -268,7 +323,7 @@ const PondDetail = () => {
            
            {/* Left Toggle Button (Centered) */}
            <button 
-             onClick={() => setShowLeftPanel(!showLeftPanel)}
+            onClick={handleToggleLeft}
              className={`absolute top-1/2 -translate-y-1/2 left-0 z-20 h-16 w-5 flex items-center justify-center rounded-r-xl bg-gray-200/50 hover:bg-gray-300/80 backdrop-blur-sm transition-all text-gray-500 hover:text-gray-800 shadow-sm border-r border-y border-white/50`}
              title={showLeftPanel ? "收起左侧栏" : "展开左侧栏"}
            >
@@ -277,37 +332,29 @@ const PondDetail = () => {
 
            {/* Right Toggle Button (Centered) */}
            <button 
-             onClick={() => setShowRightPanel(!showRightPanel)}
+            onClick={handleToggleRight}
              className={`absolute top-1/2 -translate-y-1/2 right-0 z-20 h-16 w-5 flex items-center justify-center rounded-l-xl bg-gray-200/50 hover:bg-gray-300/80 backdrop-blur-sm transition-all text-gray-500 hover:text-gray-800 shadow-sm border-l border-y border-white/50`}
              title={showRightPanel ? "收起右侧栏" : "展开右侧栏"}
            >
              {showRightPanel ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
            </button>
 
-           {/* Chart Title Overlay */}
-           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none select-none">
-              <span className="text-9xl font-black text-gray-900 tracking-widest" style={{ writingMode: 'horizontal-tb' }}>趋势图</span>
-           </div>
-
+           {/* Chart Header with Title and DatePicker */}
            <div className="flex justify-between items-center mb-6 z-10">
               <h2 className="text-2xl font-bold text-gray-900">趋势图</h2>
+              <div className="w-[300px]">
+                 <CustomDatePicker 
+                   value={dateRange}
+                   onChange={setDateRange}
+                 />
+              </div>
            </div>
 
-           <div className="flex-1 w-full min-h-0 z-10">
-             <ResponsiveContainer width="100%" height="100%">
-               <LineChart data={[]} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                 <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 14 }} dy={10} />
-                 <YAxis yAxisId="left" orientation="left" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 14 }} />
-                 <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 14 }} />
-                 <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                 />
-                 <Line yAxisId="left" type="monotone" dataKey="pH" stroke="#ef4444" strokeWidth={4} dot={false} activeDot={{ r: 8 }} />
-                 <Line yAxisId="left" type="monotone" dataKey="do" stroke="#10b981" strokeWidth={4} dot={false} activeDot={{ r: 8 }} />
-                 <Line yAxisId="right" type="monotone" dataKey="temp" stroke="#f59e0b" strokeWidth={4} dot={false} activeDot={{ r: 8 }} />
-               </LineChart>
-             </ResponsiveContainer>
+           {/* Trend Chart Component */}
+           <div className="flex-1 w-full min-h-0 z-10 relative">
+              <div className="relative z-10 h-full">
+                <TrendChart data={trendData} loading={trendLoading} />
+              </div>
            </div>
         </div>
 

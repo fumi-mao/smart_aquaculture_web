@@ -12,3 +12,14 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+.chart-no-outline:focus {
+  outline: none;
+}
+.chart-no-outline *:focus {
+  outline: none;
+}
+.recharts-wrapper:focus,
+.recharts-surface:focus {
+  outline: none;
+}
