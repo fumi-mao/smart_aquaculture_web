@@ -4,6 +4,20 @@ import { getGroupsList } from '@/services/groups';
 import { Loader2, Fish, ArrowDownToLine, Maximize2, Droplets, Thermometer, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+/**
+ * 仪表盘页面 (Dashboard)
+ * 作用：展示用户所有的塘口列表及概览信息，作为应用的主页。
+ * 输入：无 (自动获取用户塘口数据)
+ * 输出：塘口列表 UI
+ * 逻辑：
+ *  1. 尝试从本地缓存加载塘口数据 (localStorage)
+ *  2. 获取所有群组及关联的塘口数据 (fetchPonds, getGroupPondsData)
+ *  3. 合并自有塘口和群组塘口，去重并排序
+ *  4. 渲染塘口卡片列表
+ * 样式：
+ *  - 网格布局显示卡片 grid-cols-1 md:grid-cols-2
+ *  - 透明背景 bg-transparent (融入整体布局)
+ */
 const Dashboard = () => {
   const [ponds, setPonds] = useState<Pond[]>([]);
   const [loading, setLoading] = useState(true);

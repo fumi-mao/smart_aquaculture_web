@@ -64,6 +64,21 @@ const formatTimeDisplay = (timeStr: string) => {
   }
 };
 
+/**
+ * 塘口详情页 (PondDetail)
+ * 作用：展示特定塘口的详细信息，包括养殖记录、水质趋势图、塘口基本信息及人员。
+ * 输入：URL 参数 id (塘口ID)
+ * 输出：塘口详情 UI
+ * 逻辑：
+ *  1. 获取塘口详情 (getPondDetail)
+ *  2. 获取关联群组信息 (getGroupInfo)
+ *  3. 获取养殖记录 (getBreedingRecords) 并进行格式化和排序
+ *  4. 渲染三个主要区域：记录列表(左)、趋势图(中)、信息面板(右)
+ * 样式：
+ *  - 使用 Flex 布局分隔头部和主体
+  *  - 主体分为三栏，使用 gap 分隔
+  *  - 各区域圆角 rounded-md，白色背景，阴影
+  */
 const PondDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -148,18 +163,18 @@ const PondDetail = () => {
   if (loading || !pond) return <div className="flex h-full items-center justify-center">Loading...</div>;
 
   return (
-    <div className="flex h-full flex-col bg-transparent overflow-hidden">
+    <div className="flex h-full flex-col bg-transparent overflow-hidden gap-3">
       {/* Top Header Row (Back) */}
-      <div className="h-12 bg-white border-b border-gray-200 flex items-center px-4 shrink-0 shadow-sm z-10">
+      <div className="h-12 bg-white rounded-md flex items-center px-4 shrink-0 shadow-sm z-10">
          <div className="flex items-center gap-2 cursor-pointer text-gray-600 hover:text-blue-600 transition-colors" onClick={() => navigate('/')}>
            <ChevronLeft size={20} />
            <span className="font-bold text-lg">{pond.name}</span>
          </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden gap-3">
         {/* Left Column: Farming Records (Timeline) */}
-        <div className="w-[400px] border-r border-gray-200 flex flex-col h-full bg-white shrink-0">
+        <div className="w-[400px] rounded-md flex flex-col h-full bg-white shrink-0 shadow-sm overflow-hidden">
            {/* Pond Avatar Area */}
            <div className="p-4 border-b border-gray-100 flex flex-col items-center">
              <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-100 mb-2 shadow-sm">
@@ -242,7 +257,7 @@ const PondDetail = () => {
         </div>
 
         {/* Center Column: Trend Chart */}
-        <div className="flex-1 flex flex-col p-6 overflow-hidden bg-blue-50/30 relative">
+        <div className="flex-1 flex flex-col p-6 overflow-hidden bg-white relative rounded-md shadow-sm">
            {/* Chart Title Overlay */}
            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none select-none">
               <span className="text-9xl font-black text-gray-900 tracking-widest" style={{ writingMode: 'horizontal-tb' }}>趋势图</span>
@@ -271,7 +286,7 @@ const PondDetail = () => {
         </div>
 
         {/* Right Column: Info & Staff */}
-        <div className="w-72 border-l border-gray-200 flex flex-col h-full bg-white shrink-0 p-5 overflow-y-auto custom-scrollbar">
+        <div className="w-72 rounded-md flex flex-col h-full bg-white shrink-0 p-5 overflow-y-auto custom-scrollbar shadow-sm">
            {/* Staff Section */}
            <div className="mb-8">
               <h3 className="font-bold text-gray-900 mb-4 text-lg">塘口人员</h3>

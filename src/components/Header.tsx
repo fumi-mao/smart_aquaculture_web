@@ -4,6 +4,19 @@ import { LogOut, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getUserInfo } from '@/services/users';
 
+/**
+ * 头部组件 (Header)
+ * 作用：应用顶部导航栏，显示Logo、用户信息及退出登录按钮。
+ * 输入：无 (使用 useUserStore 获取全局用户状态)
+ * 输出：顶部导航 UI
+ * 逻辑：
+ *  1. 初始化时获取最新用户信息 (fetchUserInfo)
+ *  2. 处理退出登录 (handleLogout)
+ * 样式：
+ *  - 固定定位 fixed top-0
+ *  - 白色背景 bg-white
+ *  - 底部深色边框 border-b-4 (视觉强调)
+ */
 const Header = () => {
   const { user, logout, setUser } = useUserStore();
   const navigate = useNavigate();

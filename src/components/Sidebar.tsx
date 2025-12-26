@@ -19,12 +19,25 @@ const menuItems = [
   { icon: Settings, label: '个人中心', path: '/profile' },
 ];
 
+/**
+ * 侧边栏组件 (Sidebar)
+ * 作用：显示应用的主要导航菜单，允许用户在不同功能模块间切换。
+ * 输入：无 (使用内部配置的 menuItems)
+ * 输出：渲染侧边栏 UI
+ * 样式：
+ *  - 固定宽度 w-64
+  *  - 白色背景 bg-white
+  *  - 圆角 rounded-md (美化，调整为更小圆角)
+  *  - 阴影 shadow-sm (立体感)
+  *  - 移除右边框 (使用间距分隔)
+  */
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
   return (
-    <div className="w-64 h-full bg-white border-r border-gray-200 flex flex-col shrink-0">
+    // 修改：移除 border-r，添加 rounded-md, shadow-sm, my-0 (高度由父容器控制)
+    <div className="w-64 h-full bg-white rounded-md shadow-sm flex flex-col shrink-0 overflow-hidden">
       <nav className="flex-1 px-4 py-6 space-y-1">
         {menuItems.map((item) => {
           const isActive = location.pathname === item.path;
