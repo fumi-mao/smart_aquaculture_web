@@ -29,3 +29,11 @@ export const getPondDetail = async (id: string | number) => {
   const response = await api.get(`/ponds/${id}`);
   return response.data;
 };
+
+export const getBreedingRecords = async (pondId: number | string, page: number = 1) => {
+  const response = await api.post('/query/timeline', {
+    pond_id: typeof pondId === 'string' ? parseInt(pondId) : pondId,
+    page
+  });
+  return response.data;
+};

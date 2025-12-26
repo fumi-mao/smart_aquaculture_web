@@ -1,16 +1,27 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
-import { Pond, getPondDetail } from '@/services/ponds';
+import { Pond, getPondDetail, getBreedingRecords } from '@/services/ponds';
 import { GroupInfo, getGroupInfo, GroupUser } from '@/services/groups';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { 
+  getRecordTypeChineseName, 
+  getFullDisplayItems, 
+  getRecordIcon, 
+  DisplayItem 
+} from '@/utils/recordUtils';
 
-// FarmingRecord interface for the timeline (keeping it for structure, though data might be empty)
+// FarmingRecord interface for the timeline
 interface FarmingRecord {
   id: number;
   time: string;
   date: string;
   image?: string;
+  rawTime?: string; // For sorting
+  type: string;
+  typeName: string;
+  displayItems: DisplayItem[];
+  detail: any;
 }
 
 // Extend Pond to include extra info needed for the view
@@ -18,6 +29,40 @@ interface PondDetailInfo extends Pond {
   records?: FarmingRecord[];
   groupInfo?: GroupInfo;
 }
+
+// Helper to extract time from record
+const getRecordTime = (detail: any, type: string) => {
+  if (detail.operate_at) return detail.operate_at;
+  
+  const typeBase = type.replace('_data', '');
+  const timeFields: Record<string, string> = {
+      'feeding': 'feed_time',
+      'waterquality': 'measured_at',
+      'lossing': 'lossed_at',
+      'outfishpond': 'outfishpond_at',
+      'seed': 'seeded_at',
+      'patrol': 'created_at'
+  };
+  const field = timeFields[typeBase] || 'created_at';
+  return detail[field] || detail.operate_time || detail.created_at || new Date().toISOString();
+};
+
+const formatTimeDisplay = (timeStr: string) => {
+  try {
+    const date = new Date(timeStr.replace(/-/g, '/'));
+    if (isNaN(date.getTime())) return { date: '--', time: '--' };
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const d = date.getDate().toString().padStart(2, '0');
+    const h = date.getHours().toString().padStart(2, '0');
+    const min = date.getMinutes().toString().padStart(2, '0');
+    return {
+        date: `${m}-${d}`,
+        time: `${h}:${min}`
+    };
+  } catch (e) {
+    return { date: '--', time: '--' };
+  }
+};
 
 const PondDetail = () => {
   const { id } = useParams();
@@ -41,9 +86,47 @@ const PondDetail = () => {
              groupData = groupRes.data;
            }
            
+           // Fetch Breeding Records
+           let records: FarmingRecord[] = [];
+           try {
+             const recordsRes = await getBreedingRecords(id);
+             const rawList = recordsRes.data && Array.isArray(recordsRes.data) ? recordsRes.data : (Array.isArray(recordsRes) ? recordsRes : []);
+             
+             records = rawList.map((item: any) => {
+                const detail = item.detail || item;
+                const type = item.type || 'unknown';
+                const timeStr = getRecordTime(detail, type);
+                const { date, time } = formatTimeDisplay(timeStr);
+                
+                // Try to find an image
+                const image = detail.image_url || (Array.isArray(detail.images) && detail.images.length > 0 ? detail.images[0] : undefined) || detail.picture_url;
+                
+                const typeName = getRecordTypeChineseName(type);
+                const displayItems = getFullDisplayItems(detail, type);
+
+                return {
+                    id: detail.id || Math.random(),
+                    time,
+                    date,
+                    image,
+                    rawTime: timeStr,
+                    type,
+                    typeName,
+                    displayItems,
+                    detail
+                };
+             }).sort((a: FarmingRecord, b: FarmingRecord) => {
+                const timeA = new Date(a.rawTime || '').getTime();
+                const timeB = new Date(b.rawTime || '').getTime();
+                return timeB - timeA;
+             });
+           } catch (err) {
+             console.error('Error fetching records:', err);
+           }
+
            setPond({
              ...pondData,
-             records: [], // Placeholder as no API provided for records in this task
+             records: records,
              groupInfo: groupData
            });
          } catch (err) {
@@ -76,7 +159,7 @@ const PondDetail = () => {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left Column: Farming Records (Timeline) */}
-        <div className="w-72 border-r border-gray-200 flex flex-col h-full bg-white shrink-0">
+        <div className="w-[400px] border-r border-gray-200 flex flex-col h-full bg-white shrink-0">
            {/* Pond Avatar Area */}
            <div className="p-4 border-b border-gray-100 flex flex-col items-center">
              <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-100 mb-2 shadow-sm">
@@ -93,34 +176,66 @@ const PondDetail = () => {
              <h3 className="font-bold text-gray-900 text-lg">养殖记录</h3>
            </div>
            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-              <div className="relative pl-2">
-                 {/* Vertical Line */}
-                 <div className="absolute left-[9px] top-2 bottom-0 w-[2px] bg-gray-300"></div>
-                 
+              <div className="relative">
                  {pond.records && pond.records.length > 0 ? (
-                   pond.records.map((record) => (
-                   <div key={record.id} className="relative pl-8 mb-8 group">
-                     {/* Circle Node */}
-                     <div className="absolute left-0 top-0 w-5 h-5 bg-white border-2 border-gray-800 rounded-full z-10 box-border"></div>
-                     
-                     {/* Time & Date */}
-                     <div className="text-sm font-medium text-gray-800 mb-1 leading-tight">
-                       <div>{record.time}</div>
-                       <div>{record.date}</div>
-                     </div>
-                     
-                     {/* Content Card (Image) */}
-                     <div className="mt-2 w-full h-28 bg-gray-100 rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                        {record.image ? (
-                          <img src={record.image} alt="record" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">暂无图片</div>
-                        )}
-                     </div>
-                   </div>
-                   ))
+                   pond.records.map((record, index) => {
+                     const iconSrc = getRecordIcon(record.type);
+                     return (
+                       <div key={record.id} className="flex relative min-h-[120px] mb-2 group">
+                           {/* Left: Time */}
+                           <div className="w-16 flex flex-col items-end pr-2 text-right shrink-0 pt-1">
+                               <span className="text-lg font-bold text-gray-800 leading-none">{record.time}</span>
+                               <span className="text-xs text-gray-400 mt-1">{record.date}</span>
+                           </div>
+
+                           {/* Center: Timeline */}
+                           <div className="w-10 flex flex-col items-center relative shrink-0">
+                               {/* Line Top (only if not first) */}
+                               <div className={`w-[2px] bg-gray-200 absolute top-0 bottom-0 left-1/2 -translate-x-1/2 ${index === 0 ? 'top-4' : ''}`}></div>
+                               {/* Icon Node */}
+                               <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center z-10 relative mt-0">
+                                   <img src={iconSrc} alt={record.type} className="w-5 h-5 object-contain" />
+                               </div>
+                           </div>
+
+                           {/* Right: Card */}
+                           <div className="flex-1 pb-6 pl-2 min-w-0">
+                               <div className="bg-[#f5f9ff] rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer">
+                                   {/* Header */}
+                                   <div className="bg-[#bae4fa] px-3 py-2 flex justify-between items-center">
+                                       <span className="font-bold text-sm text-gray-800">{record.typeName}</span>
+                                   </div>
+                                   {/* Body */}
+                                   <div className="p-3 text-xs space-y-1.5">
+                                       {record.displayItems.map(item => (
+                                           <div key={item.key} className="flex">
+                                               <span className="text-gray-500 w-[90px] shrink-0 text-left pr-2">{item.label}:</span>
+                                               <span className="text-gray-800 truncate flex-1">{item.value}</span>
+                                           </div>
+                                       ))}
+                                       {/* Images if any */}
+                                       {record.image && (
+                                           <div className="mt-2 rounded-lg overflow-hidden h-28 w-full bg-gray-100 border border-gray-100">
+                                               <img src={record.image} className="w-full h-full object-cover" alt="record"/>
+                                           </div>
+                                       )}
+                                       {/* Creator Info */}
+                                       <div className="pt-2 mt-2 border-t border-dashed border-gray-200 flex justify-end text-[10px] text-gray-400">
+                                          {record.detail.created_by_user && record.detail.created_by_user.nickname && (
+                                              <span className="truncate max-w-[100px]">{record.detail.created_by_user.nickname}</span>
+                                          )}
+                                       </div>
+                                   </div>
+                               </div>
+                           </div>
+                       </div>
+                     );
+                   })
                  ) : (
-                   <div className="text-gray-400 text-sm pl-8">暂无记录</div>
+                   <div className="flex flex-col items-center justify-center pt-10 pl-8 pr-4">
+                       <img src="/nohistory.svg" alt="暂无记录" className="w-24 h-24 mb-2 opacity-60" />
+                       <span className="text-gray-400 text-sm">暂无记录</span>
+                   </div>
                  )}
               </div>
            </div>
