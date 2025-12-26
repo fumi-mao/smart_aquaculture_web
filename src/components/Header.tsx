@@ -46,14 +46,8 @@ const Header = () => {
   return (
     <header className="h-14 bg-white border-b-4 border-[#38393c] flex items-center justify-between px-4 fixed top-0 left-0 right-0 z-50">
       <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-        {user?.avatar_url ? (
-            <img src={user.avatar_url} alt="Logo" className="w-8 h-8 rounded-full shadow-sm object-cover" />
-        ) : (
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white shadow-sm">
-               <span className="text-xs font-bold">虾</span>
-            </div>
-        )}
-        <span className="text-blue-600 font-bold text-xl">{user?.nickname || '智能养虾'}</span>
+        <img src="/favicon.svg" alt="Logo" className="w-8 h-8 object-contain" />
+        <img src="/tangqianyan-text.svg" alt="塘前眼" className="h-6 object-contain" />
       </div>
       
       <div className="flex items-center gap-6">
