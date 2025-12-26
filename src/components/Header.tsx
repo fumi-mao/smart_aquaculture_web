@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useUserStore } from '@/store/useUserStore';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getUserInfo } from '@/services/users';
 
@@ -20,6 +20,7 @@ import { getUserInfo } from '@/services/users';
 const Header = () => {
   const { user, logout, setUser } = useUserStore();
   const navigate = useNavigate();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     const fetchUserInfo = async () => {
@@ -38,10 +39,30 @@ const Header = () => {
     fetchUserInfo();
   }, [user?.user_id]);
 
-  const handleLogout = () => {
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(!showLogoutConfirm);
+  };
+
+  const confirmLogout = () => {
     logout();
+    setShowLogoutConfirm(false);
     navigate('/login');
   };
+
+  // Click outside to close the popover
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showLogoutConfirm && !target.closest('.logout-container')) {
+        setShowLogoutConfirm(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showLogoutConfirm]);
 
   return (
     <header className="h-14 bg-white border-b-4 border-[#38393c] flex items-center justify-between px-4 fixed top-0 left-0 right-0 z-50">
@@ -60,13 +81,39 @@ const Header = () => {
              )}
             <span>{user?.nickname || '用户'}</span>
           </div>
-          <button 
-            onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs flex items-center gap-1 transition-colors"
-          >
-            <LogOut size={12} />
-            退出登录
-          </button>
+          
+          <div className="relative logout-container">
+            <button 
+              onClick={handleLogoutClick}
+              className={`px-3 py-1 rounded text-xs flex items-center gap-1 transition-colors ${showLogoutConfirm ? 'bg-red-600 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+            >
+              <LogOut size={12} />
+              退出登录
+            </button>
+
+            {/* Logout Confirmation Popover */}
+            {showLogoutConfirm && (
+              <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-gray-600 font-medium text-center mb-1">确认要退出登录吗?</p>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setShowLogoutConfirm(false)}
+                      className="flex-1 py-1.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs transition-colors"
+                    >
+                      取消
+                    </button>
+                    <button 
+                      onClick={confirmLogout}
+                      className="flex-1 py-1.5 px-2 bg-red-500 hover:bg-red-600 text-white rounded text-xs transition-colors"
+                    >
+                      确认
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>
