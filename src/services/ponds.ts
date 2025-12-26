@@ -52,3 +52,19 @@ export const getTrendData = async (params: {
   const response = await api.post('/query/timeline', params);
   return response.data;
 };
+
+/**
+ * 获取最近的水质记录
+ * @param pondId 塘口ID
+ * @param limit 获取条数，默认为2
+ * @returns 水质记录列表
+ */
+export const getRecentWaterQuality = async (pondId: number | string, limit: number = 2) => {
+  const response = await api.post('/query/timeline', {
+    pond_id: typeof pondId === 'string' ? parseInt(pondId) : pondId,
+    type: ['waterquality_data'],
+    page: 1,
+    page_size: limit
+  });
+  return response.data;
+};

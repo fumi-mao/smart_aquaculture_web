@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { getPondList, getPondDetail, Pond } from '@/services/ponds';
+import { getPondList, getPondDetail, Pond, getRecentWaterQuality } from '@/services/ponds';
 import { getGroupsList } from '@/services/groups';
-import { Loader2, Fish, ArrowDownToLine, Maximize2, Droplets, Thermometer, Activity } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import PondCard from '@/components/PondCard';
 
 /**
  * 仪表盘页面 (Dashboard)
@@ -13,7 +14,8 @@ import { useNavigate } from 'react-router-dom';
  *  1. 尝试从本地缓存加载塘口数据 (localStorage)
  *  2. 获取所有群组及关联的塘口数据 (fetchPonds, getGroupPondsData)
  *  3. 合并自有塘口和群组塘口，去重并排序
- *  4. 渲染塘口卡片列表
+ *  4. 并发获取所有塘口的最近水质数据 (fetchAllWaterQuality)
+ *  5. 渲染塘口卡片列表 (PondCard)
  * 样式：
  *  - 网格布局显示卡片 grid-cols-1 md:grid-cols-2
  *  - 透明背景 bg-transparent (融入整体布局)
@@ -21,6 +23,9 @@ import { useNavigate } from 'react-router-dom';
 const Dashboard = () => {
   const [ponds, setPonds] = useState<Pond[]>([]);
   const [loading, setLoading] = useState(true);
+  // 存储所有塘口的水质数据，key为pondId
+  const [waterQualityData, setWaterQualityData] = useState<Record<number, any[]>>({});
+  const [loadingWaterQuality, setLoadingWaterQuality] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -32,6 +37,8 @@ const Dashboard = () => {
         if (Array.isArray(cachedPonds)) {
           setPonds(cachedPonds);
           setLoading(false);
+          // 缓存加载后也需要去获取最新的水质数据
+          fetchAllWaterQuality(cachedPonds);
         }
       } catch (e) {
         console.warn('Failed to parse cached ponds', e);
@@ -40,6 +47,39 @@ const Dashboard = () => {
 
     fetchPonds();
   }, []);
+
+  // 并发获取所有塘口的水质数据
+  const fetchAllWaterQuality = async (pondList: Pond[]) => {
+    if (!pondList || pondList.length === 0) return;
+    
+    setLoadingWaterQuality(true);
+    try {
+      // 创建并发请求任务
+      const tasks = pondList.map(pond => 
+        getRecentWaterQuality(pond.id, 2)
+          .then(res => ({ id: pond.id, data: res.data || [] }))
+          .catch(err => {
+            console.warn(`Failed to fetch water quality for pond ${pond.id}`, err);
+            return { id: pond.id, data: [] };
+          })
+      );
+
+      // 等待所有请求完成 (Promise.all 实现并发)
+      const results = await Promise.all(tasks);
+      
+      // 整理结果到 Map
+      const newData: Record<number, any[]> = {};
+      results.forEach(item => {
+        newData[item.id] = item.data;
+      });
+      
+      setWaterQualityData(prev => ({ ...prev, ...newData }));
+    } catch (err) {
+      console.error('Error fetching water quality data', err);
+    } finally {
+      setLoadingWaterQuality(false);
+    }
+  };
 
   const fetchAllGroups = async () => {
     try {
@@ -163,6 +203,9 @@ const Dashboard = () => {
          ponds: unique
       }));
 
+      // 获取完塘口列表后，立即并发获取水质数据
+      fetchAllWaterQuality(unique);
+
     } catch (err) {
       console.error(err);
       if (!cached) setPonds([]); 
@@ -186,86 +229,12 @@ const Dashboard = () => {
          ) : (
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {ponds.map(pond => (
-                <div 
+                <PondCard 
                   key={pond.id} 
-                  className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer group flex flex-col" 
-                  onClick={() => navigate(`/pond/${pond.id}`)}
-                >
-                  {/* Card Header */}
-                  <div className="flex justify-between items-center px-5 py-3 border-b border-gray-100">
-                    <h3 className="font-bold text-gray-900 text-xl truncate pr-2">{pond.name}</h3>
-                    {pond.is_demo && (
-                      <span className="px-2 py-0.5 text-xs border border-gray-300 rounded text-gray-500 shrink-0">
-                        示例
-                      </span>
-                    )}
-                  </div>
-                  
-                  {/* Card Body */}
-                  <div className="flex p-4 gap-4">
-                    {/* Pond Image */}
-                    <div className="w-32 h-32 shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 shadow-sm">
-                       {pond.picture_url ? (
-                          <img src={pond.picture_url} alt={pond.name} className="w-full h-full object-cover" />
-                       ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <img src="/favicon.svg" alt={pond.name} className="w-12 h-12 opacity-20" />
-                          </div>
-                       )}
-                    </div>
-                    
-                    {/* Metrics (Simulated Charts) */}
-                    <div className="flex-1 flex flex-col justify-between py-0.5 min-w-0 gap-2">
-                        {/* pH */}
-                        <div>
-                           <div className="flex justify-between text-xs text-gray-500 mb-1">
-                             <span className="font-medium">pH</span>
-                             <span className="font-bold text-gray-900">7.8</span>
-                           </div>
-                           <div className="h-1.5 bg-orange-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-orange-400 w-3/4 rounded-full"></div>
-                           </div>
-                        </div>
-                        {/* Nitrite */}
-                        <div>
-                           <div className="flex justify-between text-xs text-gray-500 mb-1">
-                             <span className="font-medium">亚盐</span>
-                             <span className="font-bold text-gray-900">0.02</span>
-                           </div>
-                           <div className="h-1.5 bg-red-100 rounded-full overflow-hidden">
-                               <div className="h-full bg-red-400 w-1/4 rounded-full"></div>
-                           </div>
-                        </div>
-                        {/* Ammonia */}
-                        <div>
-                           <div className="flex justify-between text-xs text-gray-500 mb-1">
-                             <span className="font-medium">氨氮</span>
-                             <span className="font-bold text-gray-900">0.05</span>
-                           </div>
-                           <div className="h-1.5 bg-teal-100 rounded-full overflow-hidden">
-                               <div className="h-full bg-teal-500 w-1/5 rounded-full"></div>
-                           </div>
-                        </div>
-                    </div>
-                  </div>
-
-                  {/* Footer Info */}
-                  <div className="grid grid-cols-3 border-t border-gray-100 text-xs text-gray-600 divide-x divide-gray-100 bg-gray-50/50">
-                     <div className="p-3 text-center truncate flex flex-col items-center justify-center gap-1">
-                        <span className="text-gray-400 scale-90">塘口面积</span>
-                        <span className="font-bold text-gray-900 text-sm">{pond.breed_area ? `${pond.breed_area}亩` : '-'}</span>
-                     </div>
-                     <div className="p-3 text-center truncate flex flex-col items-center justify-center gap-1">
-                        <span className="text-gray-400 scale-90">最大水深</span>
-                        <span className="font-bold text-gray-900 text-sm">{pond.max_depth ? `${pond.max_depth}m` : '-'}</span>
-                     </div>
-                     <div className="p-3 text-center truncate flex flex-col items-center justify-center gap-1">
-                        <span className="text-gray-400 scale-90">养殖品种</span>
-                        <span className="font-bold text-gray-900 text-sm truncate w-full px-1">{pond.breed_species || '-'}</span>
-                     </div>
-                  </div>
-
-                </div>
+                  pond={pond} 
+                  waterQualityData={waterQualityData[pond.id]}
+                  loadingData={loadingWaterQuality && !waterQualityData[pond.id]} 
+                />
               ))}
            </div>
          )}
