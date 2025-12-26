@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { Pond, getPondDetail, getBreedingRecords } from '@/services/ponds';
 import { GroupInfo, getGroupInfo, GroupUser } from '@/services/groups';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -84,6 +84,10 @@ const PondDetail = () => {
   const navigate = useNavigate();
   const [pond, setPond] = useState<PondDetailInfo | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Sidebar visibility states
+  const [showLeftPanel, setShowLeftPanel] = useState(true);
+  const [showRightPanel, setShowRightPanel] = useState(true);
 
   useEffect(() => {
     if (id) {
@@ -174,7 +178,9 @@ const PondDetail = () => {
 
       <div className="flex flex-1 overflow-hidden gap-3">
         {/* Left Column: Farming Records (Timeline) */}
-        <div className="w-[400px] rounded-md flex flex-col h-full bg-white shrink-0 shadow-sm overflow-hidden">
+        <div 
+          className={`relative rounded-md flex flex-col h-full bg-white shrink-0 shadow-sm overflow-hidden transition-all duration-300 ease-in-out ${showLeftPanel ? 'w-[400px] opacity-100' : 'w-0 opacity-0 border-none'}`}
+        >
            {/* Pond Avatar Area */}
            <div className="p-4 border-b border-gray-100 flex flex-col items-center">
              <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-100 mb-2 shadow-sm">
@@ -257,7 +263,27 @@ const PondDetail = () => {
         </div>
 
         {/* Center Column: Trend Chart */}
-        <div className="flex-1 flex flex-col p-6 overflow-hidden bg-white relative rounded-md shadow-sm">
+        <div className="flex-1 flex flex-col p-6 overflow-hidden bg-white relative rounded-md shadow-sm transition-all duration-300">
+           {/* Toggle Buttons Container - Positioned relative to the chart container */}
+           
+           {/* Left Toggle Button (Centered) */}
+           <button 
+             onClick={() => setShowLeftPanel(!showLeftPanel)}
+             className={`absolute top-1/2 -translate-y-1/2 left-0 z-20 h-16 w-5 flex items-center justify-center rounded-r-xl bg-gray-200/50 hover:bg-gray-300/80 backdrop-blur-sm transition-all text-gray-500 hover:text-gray-800 shadow-sm border-r border-y border-white/50`}
+             title={showLeftPanel ? "收起左侧栏" : "展开左侧栏"}
+           >
+             {showLeftPanel ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+           </button>
+
+           {/* Right Toggle Button (Centered) */}
+           <button 
+             onClick={() => setShowRightPanel(!showRightPanel)}
+             className={`absolute top-1/2 -translate-y-1/2 right-0 z-20 h-16 w-5 flex items-center justify-center rounded-l-xl bg-gray-200/50 hover:bg-gray-300/80 backdrop-blur-sm transition-all text-gray-500 hover:text-gray-800 shadow-sm border-l border-y border-white/50`}
+             title={showRightPanel ? "收起右侧栏" : "展开右侧栏"}
+           >
+             {showRightPanel ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+           </button>
+
            {/* Chart Title Overlay */}
            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-5 pointer-events-none select-none">
               <span className="text-9xl font-black text-gray-900 tracking-widest" style={{ writingMode: 'horizontal-tb' }}>趋势图</span>
@@ -286,7 +312,9 @@ const PondDetail = () => {
         </div>
 
         {/* Right Column: Info & Staff */}
-        <div className="w-72 rounded-md flex flex-col h-full bg-white shrink-0 p-5 overflow-y-auto custom-scrollbar shadow-sm">
+        <div 
+          className={`relative rounded-md flex flex-col h-full bg-white shrink-0 p-5 overflow-y-auto custom-scrollbar shadow-sm transition-all duration-300 ease-in-out ${showRightPanel ? 'w-72 opacity-100' : 'w-0 opacity-0 p-0 border-none'}`}
+        >
            {/* Staff Section */}
            <div className="mb-8">
               <h3 className="font-bold text-gray-900 mb-4 text-lg">塘口人员</h3>
