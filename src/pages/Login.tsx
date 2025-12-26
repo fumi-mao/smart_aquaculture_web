@@ -48,7 +48,7 @@ const Login = () => {
             <div className="p-1.5 bg-blue-500 rounded-lg text-white shadow-md">
                 <img src="/favicon.svg" className="w-6 h-6" alt="logo" />
             </div>
-            <h1 className="text-xl font-bold text-gray-700 tracking-wide">塘前燕</h1>
+            <img src="/tangqianyan-text.svg" alt="塘前燕" className="h-6 object-contain" />
          </div>
       </div>
 
