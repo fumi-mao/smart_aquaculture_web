@@ -1,0 +1,20 @@
+<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Frame">
+<g clip-path="url(#clip0_13_321)">
+<g id="Group 2085666145">
+<path id="Vector" fill-rule="evenodd" clip-rule="evenodd" d="M16.3394 22L11.9046 22L11.9046 19.1617L8.02425 17.5651L6.73073 14.1948L6.73073 13.1305L21.5133 13.1305L21.5133 14.1948L20.2199 17.5651L16.3394 19.1617L16.3394 22Z" stroke="#20A9EE" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_2" d="M14.1221 20.3839L14.1221 19.6448" stroke="#20A9EE" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_3" d="M17.8177 15.9491H11.1656" stroke="#20A9EE" stroke-linecap="round" stroke-linejoin="round"/>
+<circle id="Ellipse 15" cx="10.2786" cy="10.2666" r="1.05326" fill="#20A9EE"/>
+<circle id="Ellipse 16" cx="13.4381" cy="6.05326" r="1.05326" fill="#20A9EE"/>
+<circle id="Ellipse 17" cx="18.6385" cy="9.88018" r="1.57989" fill="#20A9EE"/>
+</g>
+</g>
+<path d="M14 0.5C21.4558 0.5 27.5 6.54416 27.5 14C27.5 21.4558 21.4558 27.5 14 27.5C6.54416 27.5 0.5 21.4558 0.5 14C0.5 6.54416 6.54416 0.5 14 0.5Z" stroke="#6DC9F8"/>
+</g>
+<defs>
+<clipPath id="clip0_13_321">
+<path d="M0 14C0 6.26801 6.26801 0 14 0C21.732 0 28 6.26801 28 14C28 21.732 21.732 28 14 28C6.26801 28 0 21.732 0 14Z" fill="white"/>
+</clipPath>
+</defs>
+</svg>

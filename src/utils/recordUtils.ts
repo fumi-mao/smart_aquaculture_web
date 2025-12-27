@@ -41,18 +41,18 @@ interface FieldConfig {
 
 // Map record types to local SVG paths
 export const RECORD_ICONS: Record<string, string> = {
-  seed: '/record_type/breed-seed-b.svg',
-  feeding: '/record_type/breed-feed-b.svg',
-  feed: '/record_type/breed-feed-b.svg',
-  waterquality: '/record_type/breed-waterquality-b.svg',
-  patrol: '/record_type/breed-pond_patrol-b.svg',
-  lossing: '/record_type/breed-loss-b.svg',
-  outfishpond: '/record_type/breed-outpond-b.svg',
-  aquacultureinputs: '/record_type/breed-aquacultureinputs-b.svg',
-  sampledata: '/record_type/breed-sample-b.svg',
-  physical_operation: '/record_type/breed-physical_opration-b.svg', // Note typo in filename
-  general_record: '/record_type/breed-general_recoed-b.svg', // Note typo in filename
-  unknown: '/record_type/breed-general_recoed-b.svg'
+  seed: '/breed-icon/breed-seed.svg',
+  feeding: '/breed-icon/breed-feed.svg',
+  feed: '/breed-icon/breed-feed.svg',
+  waterquality: '/breed-icon/breed-waterquality.svg',
+  patrol: '/breed-icon/breed-pond_patrol.svg',
+  lossing: '/breed-icon/breed-loss.svg',
+  outfishpond: '/breed-icon/breed-outpond.svg',
+  aquacultureinputs: '/breed-icon/breed-aquacultureinputs.svg',
+  sampledata: '/breed-icon/breed-sample.svg',
+  physical_operation: '/breed-icon/breed-physical_operation.svg',
+  general_record: '/breed-icon/breed-general_record.svg',
+  unknown: '/breed-icon/breed-general_record.svg'
 };
 
 export const RECORD_TYPE_MAP: Record<string, string> = {

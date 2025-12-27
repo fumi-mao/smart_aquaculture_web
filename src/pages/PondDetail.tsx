@@ -264,14 +264,22 @@ const PondDetail = () => {
         >
            {/* Pond Avatar Area */}
            <div className="p-4 border-b border-gray-100 flex flex-col items-center">
-             <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-100 mb-2 shadow-sm">
+             {/* 
+                  Action: Modify style
+                  Reason: Change avatar back to circle shape (rounded-full) as per user request
+              */}
+              <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-100 mb-2 shadow-sm">
                <img
                  src={pond.picture_url || DEFAULT_ASSETS.POND_AVATAR}
                  alt={pond.name}
                  className="w-full h-full object-cover"
                />
              </div>
-             <h3 className="font-bold text-gray-900">{pond.name}</h3>
+             {/* 
+                 Action: Remove element
+                 Reason: Hide pond name below avatar as per requirements
+                 <h3 className="font-bold text-gray-900">{pond.name}</h3>
+             */}
            </div>
 
            <div className="p-4 pb-2">
@@ -285,7 +293,14 @@ const PondDetail = () => {
                      return (
                        <div key={record.id} className="flex relative min-h-[120px] mb-2 group">
                            {/* Left: Time */}
-                           <div className="w-16 flex flex-col items-end pr-2 text-right shrink-0 pt-1">
+                           {/* 
+                               Action: Modify layout
+                               Reason: Center time vertically relative to the card.
+                                       Added justify-center to vertically align content.
+                                       Added pb-6 to match the right column's padding, ensuring alignment with the card body.
+                                       Removed pt-1.
+                           */}
+                           <div className="w-16 flex flex-col items-end justify-center pr-2 text-right shrink-0 pb-6">
                                <span className="text-lg font-bold text-gray-800 leading-none">{record.time}</span>
                                <span className="text-xs text-gray-400 mt-1">{record.date}</span>
                            </div>
@@ -293,10 +308,24 @@ const PondDetail = () => {
                            {/* Center: Timeline */}
                            <div className="w-10 flex flex-col items-center relative shrink-0">
                                {/* Line Top (only if not first) */}
-                               <div className={`w-[2px] bg-gray-200 absolute top-0 bottom-0 left-1/2 -translate-x-1/2 ${index === 0 ? 'top-4' : ''}`}></div>
+                               {/* 
+                                   Action: Modify line logic
+                                   Reason: Prevent line from overlapping with the icon. 
+                                           Start line from bottom of icon (top-8) to bottom of container.
+                                           Do not render line for the last item.
+                               */}
+                               {index !== (pond.records?.length || 0) - 1 && (
+                                   <div className="w-[2px] bg-gray-200 absolute left-1/2 -translate-x-1/2 top-8 bottom-0"></div>
+                               )}
+                               
                                {/* Icon Node */}
-                               <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center z-10 relative mt-0">
-                                   <img src={iconSrc} alt={record.type} className="w-5 h-5 object-contain" />
+                               {/* 
+                                   Action: Modify style
+                                   Reason: Remove outer circle border/bg as the icon itself now includes a circle.
+                                           Increased image size to w-8 h-8 to fill the space.
+                               */}
+                               <div className="w-8 h-8 flex items-center justify-center z-10 relative mt-0">
+                                   <img src={iconSrc} alt={record.type} className="w-8 h-8 object-contain" />
                                </div>
                            </div>
 
