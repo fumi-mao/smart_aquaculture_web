@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { Pond, getPondDetail, getBreedingRecords, getTrendData, getFeedTrendData } from '@/services/ponds';
 import { GroupInfo, getGroupInfo, GroupUser } from '@/services/groups';
@@ -17,6 +17,7 @@ import { DEFAULT_EXPORT_TYPES, startExport, downloadExport } from '@/services/ex
 import { downloadBinaryFile } from '@/utils/download';
 import { format as fmt } from 'date-fns';
 import { DEFAULT_ASSETS } from '@/config';
+import { readCachedPondDetail, writeCachedPondDetail } from '@/utils/pondLoader';
 
 // FarmingRecord interface for the timeline
 interface FarmingRecord {
@@ -89,8 +90,9 @@ const formatTimeDisplay = (timeStr: string) => {
 const PondDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [pond, setPond] = useState<PondDetailInfo | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingPond, setLoadingPond] = useState(false);
   const [exporting, setExporting] = useState(false);
   
   // Records State
@@ -194,39 +196,66 @@ const PondDetail = () => {
   };
 
   useEffect(() => {
-    if (id) {
-       setLoading(true);
-       const fetchData = async () => {
-         try {
-           // Fetch Pond Detail
-           const pondRes = await getPondDetail(id);
-           const pondData = pondRes.data;
+    if (!id) return;
+    let cancelled = false;
 
-           let groupData = null;
-           if (pondData.group_id) {
-             // Fetch Group Info using group_id from pond details
-             const groupRes = await getGroupInfo(pondData.group_id);
-             groupData = groupRes.data;
-           }
-           
-           // Initial Fetch Records
-           setRecordPage(1);
-           setRecordHasMore(true);
-           fetchRecords(1, false);
+    setRecordPage(1);
+    setRecordHasMore(true);
+    fetchRecords(1, false);
 
-           setPond({
-             ...pondData,
-             groupInfo: groupData
-           });
-         } catch (err) {
-           console.error('Error fetching pond details:', err);
-         } finally {
-           setLoading(false);
-         }
-       };
-       fetchData();
+    const statePond = (location.state as any)?.pond as Pond | undefined;
+    if (statePond && String(statePond.id) === String(id)) {
+      setPond((prev) => (prev ? prev : { ...statePond }));
     }
-  }, [id]);
+
+    const cachedDetail = readCachedPondDetail(id);
+    if (cachedDetail && String(cachedDetail.id) === String(id)) {
+      setPond((prev) => (prev ? { ...prev, ...cachedDetail } : { ...cachedDetail }));
+    }
+
+    setLoadingPond(true);
+    const fetchData = async () => {
+      try {
+        const pondRes = await getPondDetail(id);
+        const pondData = pondRes.data as Pond;
+        if (cancelled) return;
+
+        setPond((prev) => {
+          if (!prev) return { ...pondData };
+          return { ...prev, ...pondData };
+        });
+        writeCachedPondDetail(id, pondData);
+
+        if (pondData.group_id) {
+          getGroupInfo(pondData.group_id)
+            .then((groupRes: any) => {
+              if (cancelled) return;
+              const groupData = groupRes?.data || null;
+              setPond((prev) => {
+                if (!prev) return prev;
+                return { ...prev, groupInfo: groupData };
+              });
+            })
+            .catch((e: any) => {
+              if (cancelled) return;
+              console.warn('Failed to fetch group info:', e);
+            });
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Error fetching pond details:', err);
+      } finally {
+        if (!cancelled) {
+          setLoadingPond(false);
+        }
+      }
+    };
+    fetchData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, location.state]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
@@ -319,7 +348,7 @@ const PondDetail = () => {
     }
   };
 
-  if (loading || !pond) return <div className="flex h-full items-center justify-center">Loading...</div>;
+  if (!pond) return <div className="flex h-full items-center justify-center">Loading...</div>;
 
   return (
     <div className="flex h-full flex-col bg-transparent overflow-hidden gap-3">
@@ -327,7 +356,7 @@ const PondDetail = () => {
       <div className="h-12 bg-white rounded-md flex items-center px-4 shrink-0 shadow-sm z-10">
          <div className="flex items-center gap-2 cursor-pointer text-gray-600 hover:text-blue-600 transition-colors" onClick={() => navigate('/')}>
            <ChevronLeft size={20} />
-           <span className="font-bold text-lg">{pond.name}</span>
+           <span className="font-bold text-lg">{pond.name || (loadingPond ? '加载中...' : '塘口详情')}</span>
          </div>
       </div>
 

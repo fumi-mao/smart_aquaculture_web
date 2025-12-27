@@ -33,7 +33,7 @@ const PondCard: React.FC<PondCardProps> = ({ pond, waterQualityData = [], loadin
   return (
     <div 
       className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer group flex flex-col ${selectedClass}`} 
-      onClick={() => navigate(`/pond/${pond.id}`)}
+      onClick={() => navigate(`/pond/${pond.id}`, { state: { pond } })}
     >
       {/* Card Header */}
       <div className="flex justify-between items-center px-5 py-3 border-b border-gray-100">

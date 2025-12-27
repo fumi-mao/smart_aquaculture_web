@@ -6,6 +6,7 @@ type FetchDisplayPondsOptions = {
 };
 
 const PONDS_CACHE_KEY = 'cached_ponds_data';
+const POND_DETAIL_CACHE_PREFIX = 'cached_pond_detail_';
 const USER_STORE_KEY = 'smart-aquaculture-storage';
 
 function getCurrentUserId() {
@@ -52,6 +53,42 @@ function writeCachedPonds(ponds: Pond[]) {
         timestamp: Date.now(),
         user_id: userId || undefined,
         ponds,
+      })
+    );
+  } catch {
+    return;
+  }
+}
+
+export function readCachedPondDetail(id: string | number) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    const raw = window.localStorage.getItem(`${POND_DETAIL_CACHE_PREFIX}${id}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const pond = parsed?.pond;
+    if (!pond || typeof pond !== 'object') return null;
+
+    const cacheUserId = parsed?.user_id ? String(parsed.user_id) : '';
+    const currentUserId = getCurrentUserId();
+    if (cacheUserId && currentUserId && cacheUserId !== currentUserId) return null;
+
+    return pond as Pond;
+  } catch {
+    return null;
+  }
+}
+
+export function writeCachedPondDetail(id: string | number, pond: Pond) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    const userId = getCurrentUserId();
+    window.localStorage.setItem(
+      `${POND_DETAIL_CACHE_PREFIX}${id}`,
+      JSON.stringify({
+        timestamp: Date.now(),
+        user_id: userId || undefined,
+        pond,
       })
     );
   } catch {
@@ -123,6 +160,9 @@ export const fetchDisplayPonds = async (options: FetchDisplayPondsOptions = {}):
     });
     
     writeCachedPonds(unique);
+    unique.forEach((p) => {
+      writeCachedPondDetail(p.id, p);
+    });
     return unique;
 
   } catch (err) {
