@@ -13,6 +13,9 @@ import {
   getRecordIcon, 
   DisplayItem 
 } from '@/utils/recordUtils';
+import { DEFAULT_EXPORT_TYPES, startExport, downloadExport } from '@/services/export';
+import { downloadBinaryFile } from '@/utils/download';
+import { format as fmt } from 'date-fns';
 
 // FarmingRecord interface for the timeline
 interface FarmingRecord {
@@ -87,6 +90,7 @@ const PondDetail = () => {
   const navigate = useNavigate();
   const [pond, setPond] = useState<PondDetailInfo | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   
   // Trend Chart State
   const [trendData, setTrendData] = useState<any[]>([]);
@@ -217,6 +221,27 @@ const PondDetail = () => {
     if (user.id === ownerId) return '创建者';
     if (user.admin) return '管理员';
     return '观众';
+  };
+
+  const handleExport = async () => {
+    if (!id || exporting) return;
+    setExporting(true);
+    try {
+      const startRes = await startExport({
+        type: DEFAULT_EXPORT_TYPES,
+        pond_id: parseInt(id),
+        start_time: '1999-01-01 00:00:00',
+        end_time: '2029-01-31 00:00:00'
+      });
+      const jobId = startRes?.job_id || startRes?.data?.job_id || startRes;
+      if (!jobId) return;
+      const res = await downloadExport(jobId);
+      const name = pond?.name || 'pond';
+      const ts = fmt(new Date(), 'yyyyMMdd_HHmm');
+      downloadBinaryFile(`${name}_${id}_${ts}.xlsx`, res.data);
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (loading || !pond) return <div className="flex h-full items-center justify-center">Loading...</div>;
@@ -428,8 +453,8 @@ const PondDetail = () => {
 
            {/* Export Button */}
            <div className="mt-auto pt-4">
-              <button className="w-full border border-gray-900 text-gray-900 rounded-lg py-2.5 font-bold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
-                 数据导出
+              <button onClick={handleExport} disabled={exporting} className={`w-full border rounded-lg py-2.5 font-bold transition-colors flex items-center justify-center gap-2 ${exporting ? 'border-gray-300 text-gray-400 cursor-not-allowed' : 'border-gray-900 text-gray-900 hover:bg-gray-50'}`}>
+                 {exporting ? '导出中...' : '数据导出'}
               </button>
            </div>
         </div>

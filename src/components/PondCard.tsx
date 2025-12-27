@@ -6,17 +6,18 @@ import { MapPin } from 'lucide-react';
 
 interface PondCardProps {
   pond: Pond;
-  /** 最近的水质记录列表 */
   waterQualityData?: any[];
-  /** 是否正在加载水质数据 */
   loadingData?: boolean;
+  selected?: boolean;
+  selectable?: boolean;
+  onToggleSelect?: () => void;
 }
 
 /**
  * 塘口展示卡片 (PondCard)
  * 作用：展示塘口基本信息及核心水质指标的趋势
  */
-const PondCard: React.FC<PondCardProps> = ({ pond, waterQualityData = [], loadingData = false }) => {
+const PondCard: React.FC<PondCardProps> = ({ pond, waterQualityData = [], loadingData = false, selected = false, selectable = false, onToggleSelect }) => {
   const navigate = useNavigate();
 
   // 指标配置
@@ -26,14 +27,28 @@ const PondCard: React.FC<PondCardProps> = ({ pond, waterQualityData = [], loadin
     { key: 'ammonia', name: '氨氮', color: '#14b8a6', unit: 'mg/L' }, // Teal
   ];
 
+  const selectedClass = selected ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-[#fafafa]' : '';
+
   return (
     <div 
-      className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer group flex flex-col" 
+      className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer group flex flex-col ${selectedClass}`} 
       onClick={() => navigate(`/pond/${pond.id}`)}
     >
       {/* Card Header */}
       <div className="flex justify-between items-center px-5 py-3 border-b border-gray-100">
         <div className="flex items-center gap-2 min-w-0 mr-2">
+          {selectable && (
+            <input
+              type="checkbox"
+              checked={selected}
+              onClick={e => {
+                e.stopPropagation();
+                if (onToggleSelect) onToggleSelect();
+              }}
+              readOnly
+              className="w-4 h-4 accent-blue-600"
+            />
+          )}
           <h3 className="font-bold text-gray-900 text-xl truncate">{pond.name}</h3>
           {pond.is_demo && (
             <span className="px-2 py-0.5 text-xs bg-blue-500 text-white rounded shrink-0">
