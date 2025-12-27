@@ -3,6 +3,7 @@ import { useUserStore } from '@/store/useUserStore';
 import { LogOut, User, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getUserInfo } from '@/services/users';
+import { DEFAULT_ASSETS } from '@/config';
 
 /**
  * 头部组件 (Header)
@@ -77,7 +78,7 @@ const Header = () => {
              {user?.avatar_url ? (
                 <img src={user.avatar_url} alt="User" className="w-6 h-6 rounded-full object-cover" />
              ) : (
-                <User size={16} />
+                <img src={DEFAULT_ASSETS.USER_AVATAR} alt="User" className="w-6 h-6 rounded-full object-cover" />
              )}
             <span>{user?.nickname || '用户'}</span>
           </div>

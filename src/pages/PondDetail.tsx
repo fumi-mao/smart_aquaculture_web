@@ -16,6 +16,7 @@ import {
 import { DEFAULT_EXPORT_TYPES, startExport, downloadExport } from '@/services/export';
 import { downloadBinaryFile } from '@/utils/download';
 import { format as fmt } from 'date-fns';
+import { DEFAULT_ASSETS } from '@/config';
 
 // FarmingRecord interface for the timeline
 interface FarmingRecord {
@@ -264,11 +265,11 @@ const PondDetail = () => {
            {/* Pond Avatar Area */}
            <div className="p-4 border-b border-gray-100 flex flex-col items-center">
              <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-100 mb-2 shadow-sm">
-               {pond.picture_url ? (
-                 <img src={pond.picture_url} alt={pond.name} className="w-full h-full object-cover" />
-               ) : (
-                 <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400">无图</div>
-               )}
+               <img
+                 src={pond.picture_url || DEFAULT_ASSETS.POND_AVATAR}
+                 alt={pond.name}
+                 className="w-full h-full object-cover"
+               />
              </div>
              <h3 className="font-bold text-gray-900">{pond.name}</h3>
            </div>
@@ -366,7 +367,7 @@ const PondDetail = () => {
 
            {/* Chart Header with Title and DatePicker */}
            <div className="flex justify-between items-center mb-6 z-10">
-              <h2 className="text-2xl font-bold text-gray-900">趋势图</h2>
+              <h2 className="text-2xl font-bold text-gray-900">水质趋势</h2>
               <div className="w-[300px]">
                  <CustomDatePicker 
                    value={dateRange}
@@ -395,13 +396,11 @@ const PondDetail = () => {
                    pond.groupInfo.user_ids.map((user) => (
                      <div key={user.id} className="flex flex-col items-center text-center group relative">
                         <div className="w-10 h-10 border border-gray-200 rounded-full overflow-hidden mb-1">
-                          {user.avatar_url ? (
-                            <img src={user.avatar_url} alt={user.nickname} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">
-                              {user.nickname.charAt(0)}
-                            </div>
-                          )}
+                          <img
+                            src={user.avatar_url || DEFAULT_ASSETS.USER_AVATAR}
+                            alt={user.nickname}
+                            className="w-full h-full object-cover"
+                          />
                         </div>
                         <span className="text-xs font-medium text-gray-700 truncate w-full">{user.nickname}</span>
                         <span className="text-[10px] text-gray-500 scale-90">

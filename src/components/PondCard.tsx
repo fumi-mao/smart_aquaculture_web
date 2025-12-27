@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Pond } from '@/services/ponds';
 import MiniTrendChart from './MiniTrendChart';
 import { MapPin } from 'lucide-react';
+import { DEFAULT_ASSETS } from '@/config';
 
 interface PondCardProps {
   pond: Pond;
@@ -69,11 +70,11 @@ const PondCard: React.FC<PondCardProps> = ({ pond, waterQualityData = [], loadin
       <div className="flex p-4 gap-4 min-h-[13rem]"> 
         {/* Pond Image - 适当压缩宽度以留给图表 */}
         <div className="w-28 h-28 shrink-0 self-center bg-gray-100 rounded-lg overflow-hidden border border-gray-200 shadow-sm flex items-center justify-center">
-           {pond.picture_url ? (
-              <img src={pond.picture_url} alt={pond.name} className="w-full h-full object-cover" />
-           ) : (
-              <img src="/favicon.svg" alt={pond.name} className="w-12 h-12 opacity-20" />
-           )}
+          <img
+            src={pond.picture_url || DEFAULT_ASSETS.POND_AVATAR}
+            alt={pond.name}
+            className="w-full h-full object-cover"
+          />
         </div>
         
         {/* Metrics (Trend Charts) */}
