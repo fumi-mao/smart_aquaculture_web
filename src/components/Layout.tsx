@@ -1,6 +1,7 @@
 import React from 'react';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import PhoneWatermark from './PhoneWatermark';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -33,13 +34,8 @@ const Layout: React.FC<LayoutProps> = ({ children, showSidebar = true }) => {
       */}
       <div className="flex flex-1 overflow-hidden pt-16 px-3 pb-3 gap-3">
         {showSidebar && <Sidebar />}
-        {/* Main 区域
-            - relative: 定位上下文
-            - flex-1: 占据剩余空间
-            - overflow-hidden: 防止内部滚动条溢出容器
-            - rounded-md: 圆角 (统一调整为更小圆角)
-        */}
         <main className="flex-1 overflow-hidden relative rounded-md">
+          <PhoneWatermark />
           {children}
         </main>
       </div>
