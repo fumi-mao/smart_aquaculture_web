@@ -12,7 +12,7 @@ export interface UserInfo {
 }
 
 export const getUserInfo = async (userId: number | string) => {
-  const response = await api.post('/users/people', null, {
+  const response = await api.get('/users/people', {
     params: { user_id: userId },
   });
   return response.data;

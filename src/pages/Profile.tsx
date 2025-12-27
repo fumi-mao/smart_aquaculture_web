@@ -36,78 +36,111 @@ const Profile: React.FC = () => {
       }
     };
     fetchUser();
-  }, [user?.user_id, setUser, user]);
+  }, [user?.user_id]);
+
+  const calculateStats = (ponds: any[], groups: any[]) => {
+    const allPondIds = new Set<number>();
+    ponds.forEach((p: any) => {
+      if (p && p.id != null) {
+        allPondIds.add(Number(p.id));
+      }
+    });
+
+    const created = new Set<number>();
+    const joined = new Set<number>();
+    const currentUserId = Number((user as any).user_id || (user as any).id);
+    let avatarFromGroups = '';
+
+    (groups || []).forEach((g: any) => {
+      if (!g || g.pond_id == null) return;
+      const pondId = Number(g.pond_id);
+      
+      if (!allPondIds.has(pondId)) return;
+
+      const ownerId = Number(g.group_owner_id);
+
+      if (ownerId && ownerId === currentUserId) {
+        created.add(pondId);
+      } else {
+        joined.add(pondId);
+      }
+
+      const members = Array.isArray(g.user_ids) ? g.user_ids : [];
+      const self = members.find((m: any) => String(m.id) === String(currentUserId));
+      if (self && self.avatar_url && !avatarFromGroups) {
+        avatarFromGroups = self.avatar_url;
+      }
+    });
+
+    // 兜底：如果有些塘口在展示列表中但没有匹配到 group（或者是创建者），归类为创建
+    allPondIds.forEach((id) => {
+      if (!created.has(id) && !joined.has(id)) {
+        created.add(id);
+      }
+    });
+
+    if (avatarFromGroups && user) {
+      const hasAvatar = !!(user.avatar_url || (user as any).picture_url);
+      if (!hasAvatar || user.avatar_url !== avatarFromGroups) {
+        setUser({ ...user, avatar_url: avatarFromGroups });
+      }
+    }
+
+    setStats({ created: created.size, joined: joined.size });
+  };
 
   useEffect(() => {
     const loadStats = async () => {
       if (!user?.user_id) return;
       setLoadingStats(true);
+      
+      const groupsPromise = fetchAllGroups();
+      const displayPondsPromise = fetchDisplayPonds();
+      
+      // 1. 尝试从缓存加载 Ponds，并结合实时的 Groups
+      const cached = localStorage.getItem('cached_ponds_data');
+      if (cached) {
+          try {
+              const { ponds: cachedPonds } = JSON.parse(cached);
+              if (Array.isArray(cachedPonds)) {
+                  // 等待 groups 返回
+                  const groups = await groupsPromise;
+                  calculateStats(cachedPonds, groups);
+                  // 缓存命中且计算成功后，结束 loading
+                  setLoadingStats(false); 
+              }
+          } catch (e) {
+              console.warn('Failed to parse cached ponds', e);
+          }
+      }
+
       try {
+        // 2. 等待最新的 Ponds 数据
         const [ponds, groups] = await Promise.all([
-          fetchDisplayPonds(),
-          fetchAllGroups()
+          displayPondsPromise,
+          groupsPromise 
         ]);
-
-        const allPondIds = new Set<number>();
-        ponds.forEach((p: any) => {
-          if (p && p.id != null) {
-            allPondIds.add(Number(p.id));
-          }
-        });
-
-        const created = new Set<number>();
-        const joined = new Set<number>();
-        const currentUserId = Number((user as any).user_id || (user as any).id);
-        let avatarFromGroups = '';
-
-        // 只统计首页展示的塘口（allPondIds）
-        (groups || []).forEach((g: any) => {
-          if (!g || g.pond_id == null) return;
-          const pondId = Number(g.pond_id);
-          
-          // 如果塘口不在首页展示列表里，跳过（说明已退出或无权限）
-          if (!allPondIds.has(pondId)) return;
-
-          const ownerId = Number(g.group_owner_id);
-
-          if (ownerId && ownerId === currentUserId) {
-            created.add(pondId);
-          } else {
-            joined.add(pondId);
-          }
-
-          const members = Array.isArray(g.user_ids) ? g.user_ids : [];
-          const self = members.find((m: any) => String(m.id) === String(currentUserId));
-          if (self && self.avatar_url && !avatarFromGroups) {
-            avatarFromGroups = self.avatar_url;
-          }
-        });
-
-        // 兜底：如果有些塘口在展示列表中但没有匹配到 group（或者是创建者），归类为创建
-        allPondIds.forEach((id) => {
-          if (!created.has(id) && !joined.has(id)) {
-            created.add(id);
-          }
-        });
-
-        if (avatarFromGroups && user) {
-          const hasAvatar = !!(user.avatar_url || (user as any).picture_url);
-          if (!hasAvatar || user.avatar_url !== avatarFromGroups) {
-            setUser({ ...user, avatar_url: avatarFromGroups });
-          }
-        }
-
-        setStats({ created: created.size, joined: joined.size });
+        
+        calculateStats(ponds, groups);
+        
+        // 更新缓存
+        localStorage.setItem('cached_ponds_data', JSON.stringify({
+             timestamp: Date.now(),
+             ponds: ponds
+        }));
+        
       } catch (e) {
         console.error('Failed to load pond statistics:', e);
-        setStats({ created: 0, joined: 0 });
+        if (!cached) {
+            setStats({ created: 0, joined: 0 });
+        }
       } finally {
         setLoadingStats(false);
       }
     };
 
     loadStats();
-  }, [user?.user_id, user, setUser]);
+  }, [user?.user_id]);
 
   const avatarSrc = useMemo(() => {
     if (!user) return DEFAULT_ASSETS.USER_AVATAR;
@@ -122,9 +155,6 @@ const Profile: React.FC = () => {
     
     if (!phoneStr || phoneStr === 'undefined' || phoneStr === 'null') return '';
     
-    if (phoneStr.length === 11) {
-      return phoneStr.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
-    }
     return phoneStr;
   }, [user]);
 

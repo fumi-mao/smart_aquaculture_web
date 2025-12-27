@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import PhoneWatermark from './PhoneWatermark';
@@ -23,6 +24,8 @@ interface LayoutProps {
   *  - 增加外边距 padding
   */
 const Layout: React.FC<LayoutProps> = ({ children, showSidebar = true }) => {
+  const location = useLocation();
+
   return (
     // 修改：背景色改为 #fafafa
     <div className="h-screen bg-[#fafafa] flex flex-col">
@@ -36,7 +39,9 @@ const Layout: React.FC<LayoutProps> = ({ children, showSidebar = true }) => {
         {showSidebar && <Sidebar />}
         <main className="flex-1 overflow-hidden relative rounded-md">
           <PhoneWatermark />
-          {children}
+          <div key={location.pathname} className="h-full w-full animate-fade-in">
+            {children}
+          </div>
         </main>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getPondList, Pond, getRecentWaterQuality } from '@/services/ponds';
+import { Pond, getRecentWaterQuality } from '@/services/ponds';
+import { fetchDisplayPonds } from '@/utils/pondLoader';
 import { DEFAULT_EXPORT_TYPES, startExport, downloadExport } from '@/services/export';
 import { downloadBinaryFile } from '@/utils/download';
 import { format } from 'date-fns';
@@ -16,21 +17,39 @@ const DataExport = () => {
   const [loadingWaterQuality, setLoadingWaterQuality] = useState(false);
 
   useEffect(() => {
-    const fetch = async () => {
-      setLoading(true);
+    // 1. 尝试从缓存加载
+    const cached = localStorage.getItem('cached_ponds_data');
+    if (cached) {
       try {
-        const res = await getPondList({ page: 1, page_size: 100 });
-        let list: Pond[] = [];
-        if (Array.isArray(res)) list = res as any;
-        else if (Array.isArray(res?.data)) list = res.data;
-        else if (Array.isArray(res?.data?.ponds)) list = res.data.ponds;
-        else if (Array.isArray(res?.ponds)) list = res.ponds;
+        const { ponds: cachedPonds } = JSON.parse(cached);
+        if (Array.isArray(cachedPonds)) {
+          setPonds(cachedPonds);
+          // 缓存加载后，后台获取水质
+          fetchAllWaterQuality(cachedPonds);
+        }
+      } catch (e) {
+        console.warn('Failed to parse cached ponds', e);
+      }
+    }
+
+    const fetch = async () => {
+      if (!cached) setLoading(true);
+      try {
+        // 使用统一的方法获取所有塘口（我创建的 + 我加入的）
+        const list = await fetchDisplayPonds();
         setPonds(list);
+        
+        // 更新缓存
+        localStorage.setItem('cached_ponds_data', JSON.stringify({
+             timestamp: Date.now(),
+             ponds: list
+        }));
+
         if (list.length > 0) {
           fetchAllWaterQuality(list);
         }
       } catch {
-        setPonds([]);
+        if (!cached) setPonds([]);
       } finally {
         setLoading(false);
       }
