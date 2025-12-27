@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { getPondList, getPondDetail, Pond, getRecentWaterQuality } from '@/services/ponds';
-import { getGroupsList } from '@/services/groups';
+import { Pond, getRecentWaterQuality } from '@/services/ponds';
 import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PondCard from '@/components/PondCard';
+import { fetchDisplayPonds } from '@/utils/pondLoader';
 
 /**
  * 仪表盘页面 (Dashboard)
@@ -81,120 +81,12 @@ const Dashboard = () => {
     }
   };
 
-  const fetchAllGroups = async () => {
-    try {
-      const res1: any = await getGroupsList({ page: 1, page_size: 50 });
-      const data1 = res1?.data || res1;
-      
-      if (!data1) return [];
-      
-      let allGroups = Array.isArray(data1.groups) ? data1.groups : [];
-      
-      let totalPages = 1;
-      if (data1.total_pages) {
-          totalPages = data1.total_pages;
-      } else if (data1.page_info?.total_pages) {
-          totalPages = data1.page_info.total_pages;
-      } else {
-         if (allGroups.length >= 50) totalPages = 2;
-      }
-
-      if (totalPages > 1) {
-          const promises = [];
-          const MAX_PAGES = 20; 
-          const limit = Math.min(totalPages, MAX_PAGES);
-          
-          for (let p = 2; p <= limit; p++) {
-              promises.push(getGroupsList({ page: p, page_size: 50 }));
-          }
-          
-          const responses = await Promise.all(promises);
-          responses.forEach((res: any) => {
-              const data = res?.data || res;
-              if (data && Array.isArray(data.groups)) {
-                  allGroups = allGroups.concat(data.groups);
-              }
-          });
-      }
-      return allGroups;
-    } catch (e) {
-       console.warn('Failed to fetch groups:', e);
-       return [];
-    }
-  };
-
-  const getGroupPondsData = async () => {
-    try {
-      const groups = await fetchAllGroups();
-      const pondIds = Array.from(new Set(groups.map((g: any) => g.pond_id).filter(Boolean)));
-      
-      if (pondIds.length === 0) return [];
-
-      const tasks = pondIds.map(id => getPondDetail(id as number).then((r: any) => r?.data).catch(() => null));
-      const results = await Promise.allSettled(tasks);
-      
-      const ponds: Pond[] = [];
-      results.forEach(item => {
-        if (item.status === 'fulfilled' && item.value) {
-           ponds.push(item.value);
-        }
-      });
-      return ponds;
-    } catch (e) {
-      console.warn('Failed to fetch group ponds:', e);
-      return [];
-    }
-  };
-
   const fetchPonds = async () => {
     const cached = localStorage.getItem('cached_ponds_data');
     if (!cached) setLoading(true);
 
     try {
-      const pondListPromise = getPondList({ page: 1, page_size: 100 });
-      const groupPondsPromise = getGroupPondsData();
-
-      const [pondListResult, groupPondsResult] = await Promise.allSettled([pondListPromise, groupPondsPromise]);
-      
-      let newPonds: Pond[] = [];
-      
-      if (pondListResult.status === 'fulfilled') {
-        const res = pondListResult.value;
-        let list: Pond[] = [];
-        if (Array.isArray(res)) {
-          list = res;
-        } else if (res && Array.isArray(res.data)) {
-          list = res.data;
-        } else if (res && res.data && Array.isArray(res.data.list)) {
-          list = res.data.list;
-        } else if (res && res.data && Array.isArray(res.data.ponds)) {
-          list = res.data.ponds;
-        } else if (res && Array.isArray(res.list)) {
-          list = res.list;
-        } else if (res && Array.isArray(res.ponds)) {
-          list = res.ponds;
-        }
-        newPonds = [...newPonds, ...list];
-      } else {
-        console.error('Failed to fetch owned ponds', pondListResult.reason);
-      }
-
-      if (groupPondsResult.status === 'fulfilled') {
-        const groupPonds = groupPondsResult.value;
-        if (Array.isArray(groupPonds)) {
-             newPonds = [...newPonds, ...groupPonds];
-        }
-      } else {
-         console.error('Failed to fetch group ponds', groupPondsResult.reason);
-      }
-
-      let unique = Array.from(new Map(newPonds.map(item => [item.id, item])).values());
-      
-      unique.sort((a, b) => {
-        if (a.is_demo && !b.is_demo) return -1;
-        if (!a.is_demo && b.is_demo) return 1;
-        return 0;
-      });
+      const unique = await fetchDisplayPonds();
       
       setPonds(unique);
       

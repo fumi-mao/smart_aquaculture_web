@@ -1,9 +1,19 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useUserStore } from '@/store/useUserStore';
 
 const PhoneWatermark: React.FC = () => {
   const user = useUserStore((state) => state.user);
-  const phone = user?.phone ? String(user.phone) : '';
+  
+  const phone = useMemo(() => {
+    // 尝试从多个字段获取手机号
+    const raw = user?.phone || (user as any)?.mobile || '';
+    const phoneStr = String(raw);
+    
+    // 过滤无效值
+    if (!phoneStr || phoneStr === 'undefined' || phoneStr === 'null') return '';
+    
+    return phoneStr;
+  }, [user]);
 
   if (!phone) {
     return null;

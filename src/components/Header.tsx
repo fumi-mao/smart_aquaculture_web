@@ -75,11 +75,11 @@ const Header = () => {
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-gray-600 text-sm">
-             {user?.avatar_url ? (
-                <img src={user.avatar_url} alt="User" className="w-6 h-6 rounded-full object-cover" />
-             ) : (
-                <img src={DEFAULT_ASSETS.USER_AVATAR} alt="User" className="w-6 h-6 rounded-full object-cover" />
-             )}
+             <img
+               src={user?.avatar_url || (user as any)?.picture_url || DEFAULT_ASSETS.USER_AVATAR}
+               alt="User"
+               className="w-6 h-6 rounded-full object-cover"
+             />
             <span>{user?.nickname || '用户'}</span>
           </div>
           
