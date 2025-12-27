@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
 import PondDetail from '@/pages/PondDetail';
+import Data from '@/pages/Data';
 import DataExport from '@/pages/DataExport';
 import Profile from '@/pages/Profile';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -15,6 +16,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<Layout><Dashboard /></Layout>} />
           <Route path="/pond/:id" element={<Layout showSidebar={false}><PondDetail /></Layout>} />
+          <Route path="/data" element={<Layout><Data /></Layout>} />
           <Route path="/data-export" element={<Layout><DataExport /></Layout>} />
           <Route path="/profile" element={<Layout><Profile /></Layout>} />
         </Route>

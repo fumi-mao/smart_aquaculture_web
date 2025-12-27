@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
-  Bell, 
+  CalendarDays,
   Settings,
   FileDown
 } from 'lucide-react';
@@ -10,12 +10,12 @@ import { cn } from '@/lib/utils';
 /**
  * 侧边栏菜单配置
  * 根据需求移除：塘口管理、养殖记录、数据分析、AI助手
- * 新增：数据导出
+ * 新增：数据、数据导出
  */
 const menuItems = [
   { icon: LayoutDashboard, label: '首页', path: '/' },
+  { icon: CalendarDays, label: '数据', path: '/data' },
   { icon: FileDown, label: '数据导出', path: '/data-export' },
-  { icon: Bell, label: '提醒事项', path: '/reminders' },
   { icon: Settings, label: '个人中心', path: '/profile' },
 ];
 
