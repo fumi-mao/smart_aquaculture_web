@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
-import { Pond, getPondDetail, getBreedingRecords, getTrendData } from '@/services/ponds';
+import { Pond, getPondDetail, getBreedingRecords, getTrendData, getFeedTrendData } from '@/services/ponds';
 import { GroupInfo, getGroupInfo, GroupUser } from '@/services/groups';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { subDays, startOfDay, endOfDay, format } from 'date-fns';
@@ -93,6 +93,12 @@ const PondDetail = () => {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   
+  // Records State
+  const [records, setRecords] = useState<FarmingRecord[]>([]);
+  const [recordPage, setRecordPage] = useState(1);
+  const [recordHasMore, setRecordHasMore] = useState(true);
+  const [recordLoading, setRecordLoading] = useState(false);
+  
   // Trend Chart State
   const [trendData, setTrendData] = useState<any[]>([]);
   const [trendLoading, setTrendLoading] = useState(false);
@@ -123,6 +129,70 @@ const PondDetail = () => {
     }, 320);
   }, [setShowRightPanel]);
 
+  // Fetch Records Helper
+  const fetchRecords = async (page: number, isAppend: boolean = false) => {
+    if (!id) return;
+    try {
+      setRecordLoading(true);
+      const recordsRes = await getBreedingRecords(id, page);
+      const rawList = recordsRes.data && Array.isArray(recordsRes.data) ? recordsRes.data : (Array.isArray(recordsRes) ? recordsRes : []);
+      
+      // If no more data
+      if (rawList.length === 0) {
+        setRecordHasMore(false);
+        if (!isAppend) setRecords([]);
+        return;
+      }
+
+      // Check if we got less than requested (assuming default page size is 10)
+      if (rawList.length < 10) {
+        setRecordHasMore(false);
+      } else {
+        setRecordHasMore(true);
+      }
+
+      const newRecords = rawList.map((item: any) => {
+         const detail = item.detail || item;
+         const type = item.type || 'unknown';
+         const timeStr = getRecordTime(detail, type);
+         const { date, time } = formatTimeDisplay(timeStr);
+         
+         // Try to find an image
+         const image = detail.image_url || (Array.isArray(detail.images) && detail.images.length > 0 ? detail.images[0] : undefined) || detail.picture_url;
+         
+         const typeName = getRecordTypeChineseName(type);
+         const displayItems = getFullDisplayItems(detail, type);
+
+         return {
+             id: detail.id || Math.random(),
+             time,
+             date,
+             image,
+             rawTime: timeStr,
+             type,
+             typeName,
+             displayItems,
+             detail
+         };
+      });
+
+      setRecords(prev => {
+        const combined = isAppend ? [...prev, ...newRecords] : newRecords;
+        // Re-sort all records by time descending
+        return combined.sort((a: FarmingRecord, b: FarmingRecord) => {
+             const timeA = new Date(a.rawTime || '').getTime();
+             const timeB = new Date(b.rawTime || '').getTime();
+             return timeB - timeA;
+        });
+      });
+      setRecordPage(page);
+    } catch (err) {
+      console.error('Error fetching records:', err);
+    } finally {
+      setRecordLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (id) {
        setLoading(true);
@@ -139,47 +209,13 @@ const PondDetail = () => {
              groupData = groupRes.data;
            }
            
-           // Fetch Breeding Records
-           let records: FarmingRecord[] = [];
-           try {
-             const recordsRes = await getBreedingRecords(id);
-             const rawList = recordsRes.data && Array.isArray(recordsRes.data) ? recordsRes.data : (Array.isArray(recordsRes) ? recordsRes : []);
-             
-             records = rawList.map((item: any) => {
-                const detail = item.detail || item;
-                const type = item.type || 'unknown';
-                const timeStr = getRecordTime(detail, type);
-                const { date, time } = formatTimeDisplay(timeStr);
-                
-                // Try to find an image
-                const image = detail.image_url || (Array.isArray(detail.images) && detail.images.length > 0 ? detail.images[0] : undefined) || detail.picture_url;
-                
-                const typeName = getRecordTypeChineseName(type);
-                const displayItems = getFullDisplayItems(detail, type);
-
-                return {
-                    id: detail.id || Math.random(),
-                    time,
-                    date,
-                    image,
-                    rawTime: timeStr,
-                    type,
-                    typeName,
-                    displayItems,
-                    detail
-                };
-             }).sort((a: FarmingRecord, b: FarmingRecord) => {
-                const timeA = new Date(a.rawTime || '').getTime();
-                const timeB = new Date(b.rawTime || '').getTime();
-                return timeB - timeA;
-             });
-           } catch (err) {
-             console.error('Error fetching records:', err);
-           }
+           // Initial Fetch Records
+           setRecordPage(1);
+           setRecordHasMore(true);
+           fetchRecords(1, false);
 
            setPond({
              ...pondData,
-             records: records,
              groupInfo: groupData
            });
          } catch (err) {
@@ -192,21 +228,59 @@ const PondDetail = () => {
     }
   }, [id]);
 
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop <= clientHeight + 50 && !recordLoading && recordHasMore) {
+      fetchRecords(recordPage + 1, true);
+    }
+  };
+
+  // Helper to fetch all pages for trend data
+  const fetchAllTrendData = async (params: any, fetchFn: Function) => {
+    let allData: any[] = [];
+    let page = 1;
+    let hasMore = true;
+    const pageSize = 100; // Use larger page size for trend data to reduce requests
+
+    while (hasMore) {
+      const res = await fetchFn({ ...params, page, page_size: pageSize });
+      const data = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
+      
+      if (data.length > 0) {
+        allData = [...allData, ...data];
+        if (data.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+      }
+      
+      // Safety break to prevent infinite loops in case of API issues
+      if (page > 50) break;
+    }
+    return allData;
+  };
+
   // Fetch Trend Data when id or dateRange changes
   useEffect(() => {
     if (id && dateRange.startDate && dateRange.endDate) {
       setTrendLoading(true);
       const fetchTrend = async () => {
         try {
-          const params = {
+          const commonParams = {
             start_time: format(dateRange.startDate, 'yyyy-MM-dd HH:mm:ss'),
             end_time: format(dateRange.endDate, 'yyyy-MM-dd HH:mm:ss'),
             pond_id: parseInt(id),
-            type: ['waterquality_data']
           };
-          const res = await getTrendData(params);
-          const data = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
-          setTrendData(data);
+          
+          const [wqData, feedData] = await Promise.all([
+            fetchAllTrendData({ ...commonParams, type: ['waterquality_data'] }, getTrendData),
+            fetchAllTrendData(commonParams, getFeedTrendData)
+          ]);
+          
+          setTrendData([...wqData, ...feedData]);
         } catch (err) {
           console.error('Error fetching trend data:', err);
           setTrendData([]);
@@ -285,10 +359,13 @@ const PondDetail = () => {
            <div className="p-4 pb-2">
              <h3 className="font-bold text-gray-900 text-lg">养殖记录</h3>
            </div>
-           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+           <div 
+             className="flex-1 overflow-y-auto p-4 custom-scrollbar"
+             onScroll={handleScroll}
+           >
               <div className="relative">
-                 {pond.records && pond.records.length > 0 ? (
-                   pond.records.map((record, index) => {
+                 {records && records.length > 0 ? (
+                   records.map((record, index) => {
                      const iconSrc = getRecordIcon(record.type);
                      return (
                        <div key={record.id} className="flex relative min-h-[120px] mb-2 group">
@@ -311,10 +388,10 @@ const PondDetail = () => {
                                {/* 
                                    Action: Modify line logic
                                    Reason: Prevent line from overlapping with the icon. 
-                                           Start line from bottom of icon (top-8) to bottom of container.
-                                           Do not render line for the last item.
+                                   Start line from bottom of icon (top-8) to bottom of container.
+                                   Do not render line for the last item.
                                */}
-                               {index !== (pond.records?.length || 0) - 1 && (
+                               {index !== (records.length || 0) - 1 && (
                                    <div className="w-[2px] bg-gray-200 absolute left-1/2 -translate-x-1/2 top-8 bottom-0"></div>
                                )}
                                
@@ -368,6 +445,9 @@ const PondDetail = () => {
                        <span className="text-gray-400 text-sm">暂无记录</span>
                    </div>
                  )}
+                 {recordLoading && (
+                   <div className="py-4 text-center text-gray-400 text-sm">加载中...</div>
+                 )}
               </div>
            </div>
         </div>
@@ -395,8 +475,8 @@ const PondDetail = () => {
            </button>
 
            {/* Chart Header with Title and DatePicker */}
-           <div className="flex justify-between items-center mb-6 z-10">
-              <h2 className="text-2xl font-bold text-gray-900">水质趋势</h2>
+           <div className="flex justify-end items-center mb-6 z-10 relative">
+              <h2 className="text-2xl font-bold text-gray-900 absolute left-1/2 -translate-x-1/2">水质趋势图</h2>
               <div className="w-[300px]">
                  <CustomDatePicker 
                    value={dateRange}

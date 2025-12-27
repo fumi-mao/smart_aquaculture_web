@@ -48,8 +48,29 @@ export const getTrendData = async (params: {
   end_time: string;
   pond_id: number;
   type: string[];
+  page?: number;
+  page_size?: number;
 }) => {
   const response = await api.post('/query/timeline', params);
+  return response.data;
+};
+
+/**
+ * 获取投料趋势数据
+ * @param params 查询参数
+ * @returns 投料数据
+ */
+export const getFeedTrendData = async (params: {
+  start_time: string;
+  end_time: string;
+  pond_id: number;
+  page?: number;
+  page_size?: number;
+}) => {
+  const response = await api.post('/query/timeline', {
+    ...params,
+    type: ['feed_data']
+  });
   return response.data;
 };
 

@@ -9,6 +9,7 @@ interface TrendChartProps {
 
 // 参数配置映射表：将后端字段映射为中文名称、单位和颜色
 const PARAM_CONFIG: Record<string, { name: string; unit: string; color: string }> = {
+  weight: { name: '投料量', unit: 'kg', color: '#db2777' }, // Pink
   ph: { name: 'pH', unit: '', color: '#ef4444' },
   oxygen: { name: '溶氧', unit: 'mg/L', color: '#10b981' },
   temperature: { name: '水温', unit: '℃', color: '#f59e0b' },
@@ -58,7 +59,7 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
   // 1. 数据预处理：提取时间戳和数值
   const processedData = data.map(item => {
     const detail = item.detail || item;
-    const timeStr = detail.measured_at || detail.created_at || detail.operate_at;
+    const timeStr = detail.measured_at || detail.created_at || detail.operate_at || detail.feed_time;
     
     // 提取数值
     const values: any = {};
@@ -88,7 +89,12 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
     });
   });
 
-  const activeKeys = Array.from(availableKeys);
+  const activeKeys = Array.from(availableKeys).sort((a, b) => {
+    // 投料趋势图位于最上方
+    if (a === 'weight') return -1;
+    if (b === 'weight') return 1;
+    return 0;
+  });
 
   if (activeKeys.length === 0) {
     return <div className="h-full flex items-center justify-center text-gray-400">暂无趋势数据</div>;
@@ -101,7 +107,7 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
   // But maintain a minimum width of 100% or a fixed pixel value
   const minWidth = 1200; // Increase base minimum width
   const pointWidth = 20; // Width per data point
-  const dynamicWidth = Math.max(minWidth, processedData.length * pointWidth);
+  // const dynamicWidth = Math.max(minWidth, processedData.length * pointWidth);
   
   const smallKeysSet = new Set(['nitrite', 'ammonia', 'oxygen']);
   const formatTickPreview = (val: number, key: string, unit: string) => {
@@ -147,8 +153,11 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
       {activeKeys.map((key, index) => {
         const config = PARAM_CONFIG[key];
         
+        // 过滤出该字段有值的数据
+        const specificData = processedData.filter(d => d[key] !== null && d[key] !== undefined);
+        const values = specificData.map(d => d[key]) as number[];
+
         // 计算 Y 轴 Domain
-        const values = processedData.map(d => d[key]).filter(v => v !== null && v !== undefined) as number[];
         let domain: [number | 'auto', number | 'auto'] = ['auto', 'auto'];
         let minVal = 0;
         let maxVal = 0;
@@ -163,12 +172,15 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
               domain = [minVal - padding, maxVal + padding];
            }
         }
+        
+        // 为该图表单独计算宽度
+        const dynamicWidth = Math.max(minWidth, specificData.length * pointWidth);
 
         return (
           <SingleChart 
             key={key}
             config={config}
-            data={processedData}
+            data={specificData}
             dataKey={key}
             domain={domain}
             values={values}
