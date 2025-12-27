@@ -86,7 +86,7 @@ const Dashboard = () => {
     if (!cached) setLoading(true);
 
     try {
-      const unique = await fetchDisplayPonds();
+      const unique = await fetchDisplayPonds({ forceNetwork: true });
       
       setPonds(unique);
       

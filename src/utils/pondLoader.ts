@@ -1,6 +1,64 @@
 import { getPondList, getPondDetail, Pond } from '@/services/ponds';
 import { fetchAllGroups } from './groupsLoader';
 
+type FetchDisplayPondsOptions = {
+  forceNetwork?: boolean;
+};
+
+const PONDS_CACHE_KEY = 'cached_ponds_data';
+const USER_STORE_KEY = 'smart-aquaculture-storage';
+
+function getCurrentUserId() {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return '';
+    const raw = window.localStorage.getItem(USER_STORE_KEY);
+    if (!raw) return '';
+    const parsed = JSON.parse(raw);
+    const state = parsed?.state || parsed;
+    const user = state?.user;
+    const userId = user?.user_id ?? user?.id ?? '';
+    return userId ? String(userId) : '';
+  } catch {
+    return '';
+  }
+}
+
+function readCachedPonds() {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    const raw = window.localStorage.getItem(PONDS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const ponds = parsed?.ponds;
+    if (!Array.isArray(ponds)) return null;
+
+    const cacheUserId = parsed?.user_id ? String(parsed.user_id) : '';
+    const currentUserId = getCurrentUserId();
+    if (cacheUserId && currentUserId && cacheUserId !== currentUserId) return null;
+
+    return ponds as Pond[];
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedPonds(ponds: Pond[]) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    const userId = getCurrentUserId();
+    window.localStorage.setItem(
+      PONDS_CACHE_KEY,
+      JSON.stringify({
+        timestamp: Date.now(),
+        user_id: userId || undefined,
+        ponds,
+      })
+    );
+  } catch {
+    return;
+  }
+}
+
 /**
  * 获取用于展示的塘口列表
  * 逻辑与首页 Dashboard 完全一致：
@@ -10,8 +68,13 @@ import { fetchAllGroups } from './groupsLoader';
  * 
  * @returns Promise<Pond[]> 最终展示的塘口列表
  */
-export const fetchDisplayPonds = async (): Promise<Pond[]> => {
+export const fetchDisplayPonds = async (options: FetchDisplayPondsOptions = {}): Promise<Pond[]> => {
   try {
+    if (!options.forceNetwork) {
+      const cached = readCachedPonds();
+      if (cached) return cached;
+    }
+
     const pondListPromise = getPondList({ page: 1, page_size: 100 });
     const groupPondsPromise = getGroupPondsData();
 
@@ -59,6 +122,7 @@ export const fetchDisplayPonds = async (): Promise<Pond[]> => {
       return 0;
     });
     
+    writeCachedPonds(unique);
     return unique;
 
   } catch (err) {
