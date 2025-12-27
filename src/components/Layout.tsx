@@ -18,7 +18,7 @@ interface LayoutProps {
  * 输出：带有统一布局结构的 HTML 结构
  * 样式：
  *  - 全屏高度 h-screen
- *  - 背景色 #fafafa (缓冲地带颜色)
+ *  - 渐变背景 bg-gradient-to-br (全站统一背景效果)
   *  - Flex 布局，包含头部和下方的左右分栏
   *  - 增加各个区域之间的间距 gap-3
   *  - 增加外边距 padding
@@ -27,8 +27,8 @@ const Layout: React.FC<LayoutProps> = ({ children, showSidebar = true }) => {
   const location = useLocation();
 
   return (
-    // 修改：背景色改为 #fafafa
-    <div className="h-screen bg-[#fafafa] flex flex-col">
+    // 修改：全站布局使用统一的渐变背景
+    <div className="h-screen bg-gradient-to-br from-[#f0f5f9] to-[#dbeafe] flex flex-col">
       <Header />
       {/* 修改：
           - pt-16: 顶部内边距 (Header 3.5rem + 0.5rem gap)

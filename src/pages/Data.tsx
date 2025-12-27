@@ -350,7 +350,8 @@ const Data = () => {
               ) : (
                 <div className="grid grid-cols-7 gap-2">
                   {cells.map((cell) => {
-                    const topTwo = cell.records.slice(0, 2);
+                    const firstTwo = cell.records.slice(0, 2);
+                    const overflowCount = Math.max(0, cell.records.length - 2);
                     return (
                       <button
                         key={cell.key}
@@ -361,9 +362,11 @@ const Data = () => {
                           }
                         }}
                         className={cn(
-                          'h-24 rounded-xl border p-2 flex flex-col text-left transition-colors overflow-hidden',
+                          'h-32 rounded-xl border p-2 flex flex-col text-left transition-colors overflow-hidden',
                           cell.inCurrentMonth ? 'bg-white' : 'bg-gray-50',
-                          cell.isSelected ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-100 hover:bg-gray-50'
+                          cell.isSelected
+                            ? 'border-blue-400 ring-2 ring-blue-100 shadow-sm'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
                         )}
                       >
                         <div className="flex items-center justify-between">
@@ -375,24 +378,29 @@ const Data = () => {
                           )}
                         </div>
 
-                        <div className="mt-1 space-y-1 min-h-0">
-                          {topTwo.length === 0 ? (
-                            <div className="h-8" />
-                          ) : (
-                            topTwo.map((r) => (
-                              <div key={String(r.id)} className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-2 py-1">
+                        <div className="mt-1 grid grid-rows-3 gap-1 min-h-0 flex-1">
+                          {Array.from({ length: 2 }).map((_, idx) => {
+                            const r = firstTwo[idx];
+                            if (!r) return <div key={`empty-${idx}`} className="min-h-[22px]" />;
+                            return (
+                              <div
+                                key={String(r.id)}
+                                className="min-h-[22px] flex items-center gap-1.5 bg-[#e9f5fe] rounded-lg px-2 py-1"
+                              >
                                 <img src={r.icon} alt={r.typeName} className="w-3.5 h-3.5 shrink-0" />
                                 <span className="text-[10px] text-gray-700 truncate">{getRecordSummary(r)}</span>
                               </div>
-                            ))
+                            );
+                          })}
+
+                          {overflowCount > 0 ? (
+                            <div className="min-h-[22px] flex items-center justify-center rounded-lg bg-[#e9f5fe] border border-dashed border-gray-200 text-[10px] text-gray-500">
+                              +{overflowCount}
+                            </div>
+                          ) : (
+                            <div className="min-h-[22px]" />
                           )}
                         </div>
-
-                        {cell.records.length > 2 && (
-                          <div className="mt-auto text-[10px] text-gray-400">
-                            还有 {cell.records.length - 2} 条
-                          </div>
-                        )}
                       </button>
                     );
                   })}
@@ -427,9 +435,9 @@ const Data = () => {
                     const timeText = dt ? format(dt, 'HH:mm') : '--:--';
                     const preview = (r.displayItems || []).slice(0, 3);
                     return (
-                      <div key={String(r.id)} className="border border-gray-100 rounded-xl p-4 hover:bg-gray-50 transition-colors">
+                      <div key={String(r.id)} className="border border-gray-100 rounded-xl p-4 bg-[#e9f5fe] transition-colors">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center border border-gray-100 shrink-0">
+                          <div className="w-9 h-9 rounded-lg bg-[#e9f5fe] flex items-center justify-center border border-gray-100 shrink-0">
                             <img src={r.icon} alt={r.typeName} className="w-5 h-5" />
                           </div>
                           <div className="min-w-0 flex-1">
