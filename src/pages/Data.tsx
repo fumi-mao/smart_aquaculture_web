@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, format, isSameMonth, isSameDay } from 'date-fns';
 import { Pond, getTrendData } from '@/services/ponds';
 import { fetchDisplayPonds } from '@/utils/pondLoader';
@@ -7,6 +7,7 @@ import { DEFAULT_EXPORT_TYPES } from '@/services/export';
 import { DEFAULT_ASSETS } from '@/config';
 import { getFullDisplayItems, getRecordIcon, getRecordTypeChineseName } from '@/utils/recordUtils';
 import { cn } from '@/lib/utils';
+import { getAiAnalysisText, getAnalysisItem } from '@/services/analysis';
 
 type TimelineRawItem = {
   type?: string;
@@ -45,6 +46,19 @@ function safeParseDate(input: string) {
   const d = new Date(input);
   if (Number.isNaN(d.getTime())) return null;
   return d;
+}
+
+function normalizeAiText(input: string) {
+  const s = String(input || '').replace(/\r\n/g, '\n').trimStart();
+  if (!s) return '';
+  if (/无记录/.test(s)) return '你当日没有记录哦~';
+  return s;
+}
+
+function getRecordUuid(record: CalendarRecord) {
+  const uuid = record?.detail?.uuid;
+  if (!uuid) return '';
+  return String(uuid);
 }
 
 function extractTimelineList(res: any): TimelineRawItem[] {
@@ -94,6 +108,15 @@ const Data = () => {
 
   const [monthLoading, setMonthLoading] = useState(false);
   const [recordsByDate, setRecordsByDate] = useState<Record<string, CalendarRecord[]>>({});
+
+  const [aiSummaryText, setAiSummaryText] = useState('');
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiSummaryError, setAiSummaryError] = useState('');
+
+  const [aiItemTextMap, setAiItemTextMap] = useState<Record<string, string>>({});
+  const [aiItemLoadingMap, setAiItemLoadingMap] = useState<Record<string, boolean>>({});
+  const [aiItemErrorMap, setAiItemErrorMap] = useState<Record<string, string>>({});
+  const [aiItemExpandedMap, setAiItemExpandedMap] = useState<Record<string, boolean>>({});
 
   const [splitRatio, setSplitRatio] = useState(0.55);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -248,6 +271,69 @@ const Data = () => {
   const selectedRecords = recordsByDate[selectedKey] || [];
 
   const selectedPond = useMemo(() => ponds.find((p) => p.id === selectedPondId) || null, [ponds, selectedPondId]);
+  const selectedPondIsDemo = Boolean(selectedPond?.is_demo);
+
+  useEffect(() => {
+    setAiSummaryText('');
+    setAiSummaryLoading(false);
+    setAiSummaryError('');
+    setAiItemTextMap({});
+    setAiItemLoadingMap({});
+    setAiItemErrorMap({});
+    setAiItemExpandedMap({});
+  }, [selectedPondId, selectedKey]);
+
+  const handleGenerateSummary = async () => {
+    if (!selectedPondId) return;
+    const startStr = selectedKey;
+    const endStr = format(addDays(selectedDate, 1), 'yyyy-MM-dd');
+
+    setAiSummaryLoading(true);
+    setAiSummaryError('');
+    setAiSummaryText('');
+    try {
+      const res = await getAiAnalysisText({
+        pond_id: selectedPondId,
+        start_time: startStr,
+        end_time: endStr,
+        type: DEFAULT_EXPORT_TYPES,
+        is_demo: selectedPondIsDemo,
+      });
+      const normalized = normalizeAiText(res.text);
+      setAiSummaryText(normalized || '你当日没有记录哦~');
+    } catch (e) {
+      setAiSummaryError('AI因网络或模型问题暂无法服务，请稍后再试');
+      setAiSummaryText('');
+    } finally {
+      setAiSummaryLoading(false);
+    }
+  };
+
+  const handleAnalyseItem = async (record: CalendarRecord) => {
+    if (!selectedPondId) return;
+    const uuid = getRecordUuid(record);
+    if (!uuid) {
+      setAiItemErrorMap((prev) => ({ ...prev, [String(record.id)]: '该记录缺少uuid，暂无法进行AI分析' }));
+      return;
+    }
+
+    setAiItemLoadingMap((prev) => ({ ...prev, [uuid]: true }));
+    setAiItemErrorMap((prev) => ({ ...prev, [uuid]: '' }));
+    try {
+      const res = await getAnalysisItem({
+        type: record.type,
+        uuid,
+        is_demo: selectedPondIsDemo,
+      });
+      const normalized = normalizeAiText(res.text);
+      setAiItemTextMap((prev) => ({ ...prev, [uuid]: normalized || '你当日没有记录哦~' }));
+      setAiItemExpandedMap((prev) => ({ ...prev, [uuid]: true }));
+    } catch (e) {
+      setAiItemErrorMap((prev) => ({ ...prev, [uuid]: 'AI因网络或模型问题暂无法服务，请稍后再试' }));
+    } finally {
+      setAiItemLoadingMap((prev) => ({ ...prev, [uuid]: false }));
+    }
+  };
 
   return (
     <div className="flex h-full bg-transparent overflow-hidden">
@@ -429,21 +515,43 @@ const Data = () => {
               {selectedRecords.length === 0 ? (
                 <div className="text-sm text-gray-400 py-8 text-center">当天暂无记录</div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 pb-4">
                   {selectedRecords.map((r) => {
                     const dt = safeParseDate(r.rawTime);
                     const timeText = dt ? format(dt, 'HH:mm') : '--:--';
                     const preview = (r.displayItems || []).slice(0, 3);
+                    const uuid = getRecordUuid(r);
+                    const aiKey = uuid || String(r.id);
+                    const aiText = uuid ? aiItemTextMap[uuid] : '';
+                    const aiLoading = uuid ? Boolean(aiItemLoadingMap[uuid]) : false;
+                    const aiError = uuid ? (aiItemErrorMap[uuid] || '') : (aiItemErrorMap[String(r.id)] || '');
+                    const aiExpanded = uuid ? (aiItemExpandedMap[uuid] !== false) : true;
                     return (
                       <div key={String(r.id)} className="border border-gray-100 rounded-xl p-4 bg-[#e9f5fe] transition-colors">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-[#e9f5fe] flex items-center justify-center border border-gray-100 shrink-0">
-                            <img src={r.icon} alt={r.typeName} className="w-5 h-5" />
+                          <div className="w-11 h-11 rounded-xl bg-[#e9f5fe] flex items-center justify-center border border-gray-100 shrink-0">
+                            <img src={r.icon} alt={r.typeName} className="w-6 h-6" />
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-3">
                               <div className="font-semibold text-gray-900 truncate">{r.typeName}</div>
-                              <div className="text-xs text-gray-500 shrink-0">{timeText}</div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="text-xs text-gray-500">{timeText}</div>
+                                <button
+                                  type="button"
+                                  disabled={!uuid || aiLoading}
+                                  onClick={() => handleAnalyseItem(r)}
+                                  className={cn(
+                                    'h-7 px-2 rounded-lg border text-xs font-medium inline-flex items-center gap-1.5 transition-colors',
+                                    !uuid || aiLoading
+                                      ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
+                                      : 'border-blue-200 bg-white text-blue-700 hover:bg-blue-50'
+                                  )}
+                                >
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                  AI分析
+                                </button>
+                              </div>
                             </div>
                             {preview.length === 0 ? (
                               <div className="text-xs text-gray-400 mt-1 truncate">无可展示字段</div>
@@ -456,6 +564,42 @@ const Data = () => {
                                 ))}
                               </div>
                             )}
+
+                            {(aiLoading || aiError || aiText) && (
+                              <div className="mt-3 bg-white/70 border border-white rounded-xl p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2 text-xs font-semibold text-gray-800">
+                                    <Sparkles className="w-4 h-4 text-blue-600" />
+                                    AI分析
+                                  </div>
+                                  {aiText && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setAiItemExpandedMap((prev) => ({
+                                          ...prev,
+                                          [aiKey]: !(prev[aiKey] !== false),
+                                        }))
+                                      }
+                                      className="h-7 px-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-700 hover:bg-gray-50 inline-flex items-center gap-1.5"
+                                    >
+                                      {aiExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                      {aiExpanded ? '收起' : '展开'}
+                                    </button>
+                                  )}
+                                </div>
+                                {aiLoading ? (
+                                  <div className="mt-2 text-xs text-gray-500 flex items-center gap-2">
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    分析中...
+                                  </div>
+                                ) : aiError ? (
+                                  <div className="mt-2 text-xs text-red-600 whitespace-pre-line">{aiError}</div>
+                                ) : aiExpanded ? (
+                                  <div className="mt-2 text-xs text-gray-700 whitespace-pre-line">{aiText}</div>
+                                ) : null}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -463,6 +607,40 @@ const Data = () => {
                   })}
                 </div>
               )}
+
+              <div className="mt-4 border border-gray-100 rounded-xl p-4 bg-[#7b8fab]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-semibold text-white">AI总结</div>
+                  <button
+                    type="button"
+                    onClick={handleGenerateSummary}
+                    disabled={!selectedPondId || aiSummaryLoading}
+                    className={cn(
+                      'h-9 px-3 rounded-xl text-sm font-semibold border transition-colors',
+                      !selectedPondId || aiSummaryLoading
+                        ? 'border-white/30 bg-white/30 text-white/60 cursor-not-allowed'
+                        : 'border-white/40 bg-white/20 text-white hover:bg-white/30'
+                    )}
+                  >
+                    生成AI总结
+                  </button>
+                </div>
+
+                <div className="mt-3 bg-white rounded-xl border border-gray-100 p-4">
+                  {aiSummaryLoading ? (
+                    <div className="text-sm text-gray-500 flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      生成中...
+                    </div>
+                  ) : aiSummaryError ? (
+                    <div className="text-sm text-red-600 whitespace-pre-line">{aiSummaryError}</div>
+                  ) : aiSummaryText ? (
+                    <div className="text-sm text-gray-700 whitespace-pre-line">{aiSummaryText}</div>
+                  ) : (
+                    <div className="text-sm text-gray-500">点击“生成AI总结”，快速回顾当天养殖操作。</div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
