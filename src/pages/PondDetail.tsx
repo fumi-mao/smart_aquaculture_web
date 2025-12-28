@@ -14,7 +14,7 @@ import {
   DisplayItem 
 } from '@/utils/recordUtils';
 import { DEFAULT_EXPORT_TYPES, startExport, downloadExport } from '@/services/export';
-import { downloadBinaryFile } from '@/utils/download';
+import { downloadBinaryFile, downloadPagedElementsAsPdf } from '@/utils/download';
 import { format as fmt } from 'date-fns';
 import { DEFAULT_ASSETS } from '@/config';
 import { readCachedPondDetail, writeCachedPondDetail } from '@/utils/pondLoader';
@@ -94,6 +94,8 @@ const PondDetail = () => {
   const [pond, setPond] = useState<PondDetailInfo | null>(null);
   const [loadingPond, setLoadingPond] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingTrendPdf, setExportingTrendPdf] = useState(false);
+  const trendExportRef = useRef<HTMLDivElement | null>(null);
   
   // Records State
   const [records, setRecords] = useState<FarmingRecord[]>([]);
@@ -348,6 +350,86 @@ const PondDetail = () => {
     }
   };
 
+  /**
+   * 文件名片段清洗
+   * 作用：过滤 Windows/浏览器下载文件名中的非法字符，避免下载失败。
+   * 输入：任意字符串
+   * 输出：可用于文件名的安全字符串
+   */
+  const sanitizeFilenamePart = (input: string) => {
+    return String(input || 'pond').replace(/[\\/:*?"<>|]/g, '_').trim() || 'pond';
+  };
+
+  /**
+   * 导出水质趋势图 PDF
+   * 作用：将当前页面展示的水质趋势图区域转为 PDF 并自动下载（全程前端完成）。
+   * 输入：无（使用当前页面的塘口信息、日期范围与趋势图 DOM）
+   * 输出：下载一个 PDF 文件
+   * 事件绑定：右侧栏“水质趋势图导出”按钮 onClick
+   * 样式处理：通过 onClone 将滚动容器展开，尽量导出完整内容
+   */
+  const handleExportTrendPdf = async () => {
+    if (!id) return;
+    if (exportingTrendPdf) return;
+    if (!trendExportRef.current) return;
+    if (trendLoading) return;
+    if (!trendData || trendData.length === 0) return;
+
+    setExportingTrendPdf(true);
+    try {
+      const name = sanitizeFilenamePart(pond?.name || 'pond');
+      const start = dateRange?.startDate ? format(dateRange.startDate, 'yyyyMMdd') : 'start';
+      const end = dateRange?.endDate ? format(dateRange.endDate, 'yyyyMMdd') : 'end';
+      const ts = fmt(new Date(), 'yyyyMMdd_HHmm');
+      const filename = `${name}_${id}_${start}-${end}_水质趋势图_${ts}.pdf`;
+
+      const el = trendExportRef.current;
+      const items = Array.from(el.querySelectorAll('[data-trend-export-item="true"]')) as HTMLElement[];
+      const startText = dateRange?.startDate ? format(dateRange.startDate, 'yyyy-MM-dd') : '--';
+      const endText = dateRange?.endDate ? format(dateRange.endDate, 'yyyy-MM-dd') : '--';
+      await downloadPagedElementsAsPdf({
+        elements: items,
+        filename,
+        orientation: 'landscape',
+        format: 'a4',
+        itemsPerPage: 3,
+        ignoreSelector: '[data-export-ignore="true"]',
+        headerBuilder: () => {
+          const header = document.createElement('div');
+          header.style.display = 'flex';
+          header.style.alignItems = 'center';
+          header.style.justifyContent = 'space-between';
+          header.style.padding = '8px 10px';
+          header.style.borderBottom = '1px solid #e5e7eb';
+          header.style.marginBottom = '4px';
+          header.style.backgroundColor = '#ffffff';
+          header.style.boxSizing = 'border-box';
+
+          const title = document.createElement('div');
+          title.textContent = '水质趋势图';
+          title.style.fontSize = '18px';
+          title.style.fontWeight = '700';
+          title.style.color = '#111827';
+
+          const range = document.createElement('div');
+          range.textContent = `${startText} ~ ${endText}`;
+          range.style.fontSize = '12px';
+          range.style.fontWeight = '600';
+          range.style.color = '#6b7280';
+          range.style.padding = '6px 10px';
+          range.style.border = '1px solid #e5e7eb';
+          range.style.borderRadius = '8px';
+
+          header.appendChild(title);
+          header.appendChild(range);
+          return header;
+        },
+      });
+    } finally {
+      setExportingTrendPdf(false);
+    }
+  };
+
   if (!pond) return <div className="flex h-full items-center justify-center">Loading...</div>;
 
   return (
@@ -503,22 +585,28 @@ const PondDetail = () => {
              {showRightPanel ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
            </button>
 
-           {/* Chart Header with Title and DatePicker */}
-           <div className="flex justify-end items-center mb-6 z-10 relative">
-              <h2 className="text-2xl font-bold text-gray-900 absolute left-1/2 -translate-x-1/2">水质趋势图</h2>
-              <div className="w-[300px]">
-                 <CustomDatePicker 
-                   value={dateRange}
-                   onChange={setDateRange}
-                 />
-              </div>
-           </div>
+           <div
+             ref={trendExportRef}
+             id={`trend-export-${id || 'unknown'}`}
+             className="flex flex-col flex-1 min-h-0"
+           >
+             {/* Chart Header with Title and DatePicker */}
+             <div className="flex justify-end items-center mb-6 z-10 relative">
+                <h2 className="text-2xl font-bold text-gray-900 absolute left-1/2 -translate-x-1/2">水质趋势图</h2>
+                <div className="w-[300px]">
+                   <CustomDatePicker 
+                     value={dateRange}
+                     onChange={setDateRange}
+                   />
+                </div>
+             </div>
 
-           {/* Trend Chart Component */}
-           <div className="flex-1 w-full min-h-0 z-10 relative">
-              <div className="relative z-10 h-full">
-                <TrendChart data={trendData} loading={trendLoading} />
-              </div>
+             {/* Trend Chart Component */}
+             <div className="flex-1 w-full min-h-0 z-10 relative">
+                <div className="relative z-10 h-full">
+                  <TrendChart data={trendData} loading={trendLoading} />
+                </div>
+             </div>
            </div>
         </div>
 
@@ -590,6 +678,17 @@ const PondDetail = () => {
 
            {/* Export Button */}
            <div className="mt-auto pt-4">
+              <button
+                onClick={handleExportTrendPdf}
+                disabled={exportingTrendPdf || trendLoading || !trendData || trendData.length === 0}
+                className={`w-full border rounded-lg py-2.5 font-bold transition-colors flex items-center justify-center gap-2 mb-2 ${
+                  exportingTrendPdf || trendLoading || !trendData || trendData.length === 0
+                    ? 'border-gray-300 text-gray-400 cursor-not-allowed'
+                    : 'border-blue-600 text-blue-600 hover:bg-blue-50'
+                }`}
+              >
+                 {exportingTrendPdf ? '生成中...' : '水质趋势图导出'}
+              </button>
               <button onClick={handleExport} disabled={exporting} className={`w-full border rounded-lg py-2.5 font-bold transition-colors flex items-center justify-center gap-2 ${exporting ? 'border-gray-300 text-gray-400 cursor-not-allowed' : 'border-gray-900 text-gray-900 hover:bg-gray-50'}`}>
                  {exporting ? '导出中...' : '数据导出'}
               </button>

@@ -221,7 +221,7 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
        // XAxis height 30 (default approx, we need to be precise)
        // Plotting Height = 200 - 5 (top) - 5 (bottom) - 30 (XAxis) = 160px
        
-       const chartHeight = 160; 
+       const chartHeight = 141; 
        const marginTop = 5;
        const y = e.activeCoordinate.y; // Relative to chart container
        
@@ -248,6 +248,7 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
     <div 
       className="h-[200px] shrink-0 relative outline-none chart-no-outline"
       style={{ minWidth: width, width: '100%' }}
+      data-trend-export-item="true"
     >
        <div className="mb-2 ml-10 text-sm font-bold text-gray-700 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }}></span>
@@ -261,11 +262,13 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
             <div 
               className="absolute w-full border-t border-dashed border-gray-400 pointer-events-none z-0"
               style={{ top: hoverData.y + 24 + 5, left: yAxisWidth, width: `calc(100% - ${yAxisWidth}px)` }} 
+              data-export-ignore="true"
             ></div>
             {/* Y Axis Label */}
             <div 
                className="absolute bg-gray-800 text-white text-xs px-1 py-0.5 rounded pointer-events-none z-20"
                style={{ top: hoverData.y + 24 + 5 - 10, left: yAxisWidth + 2, width: Math.max(50, yAxisWidth - 10), textAlign: 'left' }}
+               data-export-ignore="true"
             >
                {hoverData.value.toFixed(2)}
             </div>
@@ -275,7 +278,7 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
        <ResponsiveContainer width="100%" height="100%">
          <LineChart
            data={data}
-           margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+           margin={{ top: 5, right: 30, left: 0, bottom: 18 }}
            onMouseMove={handleMouseMove}
            onMouseLeave={handleMouseLeave}
          >
@@ -293,7 +296,7 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
               axisLine={{ stroke: '#e5e7eb' }}
               tickLine={{ stroke: '#e5e7eb' }}
               minTickGap={30}
-              height={30}
+              height={36}
            />
           <YAxis 
              orientation="left" 
