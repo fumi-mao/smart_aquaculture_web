@@ -160,6 +160,7 @@ const DataExport = () => {
                   loadingData={loadingWaterQuality && !waterQualityData[pond.id]}
                   selected={checked}
                   selectable
+                  clickMode="select"
                   onToggleSelect={() => toggleSelect(pond.id)}
                 />
               );

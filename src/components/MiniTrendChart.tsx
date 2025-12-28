@@ -56,7 +56,7 @@ const MiniTrendChart: React.FC<MiniTrendChartProps> = ({
   // 渲染左侧信息区域 (名称 + 最新值)
   const renderInfo = () => (
     <div className="flex justify-between items-end mb-1 w-full px-1">
-      <span className="text-xs text-gray-500 font-medium">{name}</span>
+      <span className="text-xs text-gray-500 font-medium truncate">{name}</span>
       <span className="text-sm font-bold text-gray-900">
         {latestValue !== null ? latestValue : '-'} 
         <span className="text-xs font-normal text-gray-400 ml-0.5 scale-90 inline-block">{unit}</span>
@@ -89,15 +89,12 @@ const MiniTrendChart: React.FC<MiniTrendChartProps> = ({
     );
   }
 
-  // 计算Y轴范围，增加一点缓冲
   const values = validData.map(d => d.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const padding = (max - min) * 0.5;
-  // 如果 min === max (直线)，padding 为 0，导致 domain [min, min]，recharts 会处理，但最好手动给点范围
-  const domain = min === max 
-    ? [min - (min * 0.1 || 1), max + (max * 0.1 || 1)] 
-    : [min - padding, max + padding];
+  const delta = max - min;
+  const padding = delta === 0 ? Math.max(Math.abs(max) * 0.08, 1) : Math.max(delta * 0.08, 0.2);
+  const domain: [number, number] = [min - padding, max + padding];
 
   return (
     <div className="flex flex-col w-full h-14">
@@ -114,12 +111,14 @@ const MiniTrendChart: React.FC<MiniTrendChartProps> = ({
             </defs>
             <YAxis domain={domain} hide />
             <Area 
-              type="monotone" 
+              type="linear" 
               dataKey="value" 
               stroke={color} 
               fillOpacity={1} 
               fill={`url(#color-${dataKey})`} 
-              strokeWidth={2}
+              strokeWidth={2.5}
+              dot={{ r: 2, fill: color, strokeWidth: 0 }}
+              activeDot={false}
               isAnimationActive={false} // 列表页禁用动画提高性能
             />
           </AreaChart>
