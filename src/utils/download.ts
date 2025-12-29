@@ -161,14 +161,21 @@ export async function downloadElementAsPdf({
 export type DownloadPagedElementsAsPdfOptions = {
   elements: HTMLElement[];
   filename: string;
-  itemsPerPage: number;
-  headerBuilder?: () => HTMLElement;
+  itemsPerPage: number | ((ctx: { pageIndex: number }) => number);
+  headerBuilder?: (ctx: { pageIndex: number; totalPages: number }) => HTMLElement;
   orientation?: 'portrait' | 'landscape';
   format?: 'a4';
   marginPt?: number;
   scale?: number;
   backgroundColor?: string;
   ignoreSelector?: string;
+  wrapperWidthPx?: number;
+  chartHeightPx?: number | ((ctx: { pageIndex: number }) => number);
+  watermarkText?: string;
+  watermarkOpacity?: number;
+  watermarkRotateDeg?: number;
+  watermarkFontSizePx?: number;
+  watermarkGapPx?: number;
 };
 
 /**
@@ -193,9 +200,16 @@ export async function downloadPagedElementsAsPdf({
   scale = 2,
   backgroundColor = '#ffffff',
   ignoreSelector,
+  wrapperWidthPx = 1200,
+  chartHeightPx = 260,
+  watermarkText,
+  watermarkOpacity = 0.12,
+  watermarkRotateDeg = -25,
+  watermarkFontSizePx = 24,
+  watermarkGapPx = 110,
 }: DownloadPagedElementsAsPdfOptions) {
   if (!elements || elements.length === 0) return;
-  if (!itemsPerPage || itemsPerPage < 1) return;
+  if (!itemsPerPage) return;
 
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
     import('html2canvas'),
@@ -209,12 +223,33 @@ export async function downloadPagedElementsAsPdf({
   const contentHeight = pageHeight - marginPt * 2;
 
   const safeElements = elements.filter(Boolean);
-  const totalPages = Math.ceil(safeElements.length / itemsPerPage);
+
+  const getItemsPerPage = (pageIndex: number) => {
+    const n = typeof itemsPerPage === 'function' ? itemsPerPage({ pageIndex }) : itemsPerPage;
+    const v = Number(n);
+    return Number.isFinite(v) && v >= 1 ? Math.floor(v) : 1;
+  };
+
+  const getChartHeightPx = (pageIndex: number) => {
+    const n = typeof chartHeightPx === 'function' ? chartHeightPx({ pageIndex }) : chartHeightPx;
+    const v = Number(n);
+    return Number.isFinite(v) && v >= 120 ? v : 260;
+  };
+
+  const pages: HTMLElement[][] = [];
+  let cursor = 0;
+  let pageIndexForSplit = 0;
+  while (cursor < safeElements.length) {
+    const count = getItemsPerPage(pageIndexForSplit);
+    pages.push(safeElements.slice(cursor, cursor + count));
+    cursor += count;
+    pageIndexForSplit += 1;
+  }
+  const totalPages = pages.length;
 
   for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
-    const start = pageIndex * itemsPerPage;
-    const end = Math.min(start + itemsPerPage, safeElements.length);
-    const pageItems = safeElements.slice(start, end);
+    const pageItems = pages[pageIndex] || [];
+    if (pageItems.length === 0) continue;
 
     const wrapper = document.createElement('div');
     wrapper.style.position = 'fixed';
@@ -222,28 +257,71 @@ export async function downloadPagedElementsAsPdf({
     wrapper.style.top = '0';
     wrapper.style.zIndex = '-1';
     wrapper.style.backgroundColor = backgroundColor;
-    wrapper.style.padding = '8px 12px';
-    wrapper.style.width = '1200px';
+    wrapper.style.padding = '6px 10px';
+    wrapper.style.width = `${wrapperWidthPx}px`;
     wrapper.style.boxSizing = 'border-box';
     wrapper.style.display = 'flex';
     wrapper.style.flexDirection = 'column';
-    wrapper.style.gap = '14px';
+    wrapper.style.gap = '10px';
+    wrapper.style.overflow = 'hidden';
+    const minHeightPx = Math.max(1, Math.round(wrapperWidthPx * (contentHeight / contentWidth)));
+    wrapper.style.minHeight = `${minHeightPx}px`;
+
+    if (watermarkText) {
+      const wm = document.createElement('div');
+      wm.style.position = 'absolute';
+      wm.style.left = '0';
+      wm.style.top = '0';
+      wm.style.right = '0';
+      wm.style.bottom = '0';
+      wm.style.zIndex = '0';
+      wm.style.pointerEvents = 'none';
+      wm.style.userSelect = 'none';
+      wm.style.opacity = `${watermarkOpacity}`;
+      wm.style.transform = `rotate(${watermarkRotateDeg}deg)`;
+      wm.style.transformOrigin = 'center';
+      wm.style.display = 'flex';
+      wm.style.flexWrap = 'wrap';
+      wm.style.alignContent = 'flex-start';
+      wm.style.justifyContent = 'center';
+      wm.style.gap = `${watermarkGapPx}px`;
+      wm.style.padding = '60px';
+      wm.style.color = '#9ca3af';
+      wm.style.fontSize = `${watermarkFontSizePx}px`;
+      wm.style.fontWeight = '700';
+      wm.style.lineHeight = '1';
+
+      const count = 120;
+      for (let i = 0; i < count; i++) {
+        const span = document.createElement('span');
+        span.textContent = watermarkText;
+        wm.appendChild(span);
+      }
+
+      wrapper.appendChild(wm);
+    }
 
     if (headerBuilder) {
-      const header = headerBuilder();
-      if (header) wrapper.appendChild(header);
+      const header = headerBuilder({ pageIndex, totalPages });
+      if (header) {
+        header.style.position = 'relative';
+        header.style.zIndex = '1';
+        wrapper.appendChild(header);
+      }
     }
 
     pageItems.forEach((el) => {
       const cloned = el.cloneNode(true) as HTMLElement;
       cloned.style.width = '100%';
       cloned.style.minWidth = '0';
+      cloned.style.position = 'relative';
+      cloned.style.zIndex = '1';
       const chartBlocks = cloned.querySelectorAll('.chart-no-outline');
       chartBlocks.forEach((node) => {
         const n = node as HTMLElement;
         n.style.minWidth = '0';
         n.style.width = '100%';
-        n.style.height = '260px';
+        n.style.height = `${getChartHeightPx(pageIndex)}px`;
       });
       wrapper.appendChild(cloned);
     });

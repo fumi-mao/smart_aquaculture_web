@@ -360,14 +360,6 @@ const PondDetail = () => {
     return String(input || 'pond').replace(/[\\/:*?"<>|]/g, '_').trim() || 'pond';
   };
 
-  /**
-   * 导出水质趋势图 PDF
-   * 作用：将当前页面展示的水质趋势图区域转为 PDF 并自动下载（全程前端完成）。
-   * 输入：无（使用当前页面的塘口信息、日期范围与趋势图 DOM）
-   * 输出：下载一个 PDF 文件
-   * 事件绑定：右侧栏“水质趋势图导出”按钮 onClick
-   * 样式处理：通过 onClone 将滚动容器展开，尽量导出完整内容
-   */
   const handleExportTrendPdf = async () => {
     if (!id) return;
     if (exportingTrendPdf) return;
@@ -381,47 +373,168 @@ const PondDetail = () => {
       const start = dateRange?.startDate ? format(dateRange.startDate, 'yyyyMMdd') : 'start';
       const end = dateRange?.endDate ? format(dateRange.endDate, 'yyyyMMdd') : 'end';
       const ts = fmt(new Date(), 'yyyyMMdd_HHmm');
-      const filename = `${name}_${id}_${start}-${end}_水质趋势图_${ts}.pdf`;
+      const filename = `${name}_${id}_${start}-${end}_智能养殖报告_${ts}.pdf`;
 
       const el = trendExportRef.current;
       const items = Array.from(el.querySelectorAll('[data-trend-export-item="true"]')) as HTMLElement[];
       const startText = dateRange?.startDate ? format(dateRange.startDate, 'yyyy-MM-dd') : '--';
       const endText = dateRange?.endDate ? format(dateRange.endDate, 'yyyy-MM-dd') : '--';
+      const reportNo = `${fmt(new Date(), 'yyyyMMddHHmmssSSS')}${String(id).padStart(4, '0')}`;
       await downloadPagedElementsAsPdf({
         elements: items,
         filename,
-        orientation: 'landscape',
+        orientation: 'portrait',
         format: 'a4',
-        itemsPerPage: 3,
+        marginPt: 0,
+        itemsPerPage: ({ pageIndex }) => (pageIndex === 0 ? 2 : 3),
         ignoreSelector: '[data-export-ignore="true"]',
-        headerBuilder: () => {
+        wrapperWidthPx: 760,
+        chartHeightPx: ({ pageIndex }) => (pageIndex === 0 ? 300 : 260),
+        watermarkText: '塘前燕数据验证中心',
+        watermarkOpacity: 0.12,
+        watermarkFontSizePx: 26,
+        watermarkGapPx: 120,
+        headerBuilder: ({ pageIndex, totalPages }) => {
           const header = document.createElement('div');
           header.style.display = 'flex';
-          header.style.alignItems = 'center';
-          header.style.justifyContent = 'space-between';
-          header.style.padding = '8px 10px';
+          header.style.flexDirection = 'column';
+          header.style.gap = '8px';
+          header.style.padding = '14px 16px 10px 16px';
           header.style.borderBottom = '1px solid #e5e7eb';
-          header.style.marginBottom = '4px';
           header.style.backgroundColor = '#ffffff';
           header.style.boxSizing = 'border-box';
 
-          const title = document.createElement('div');
-          title.textContent = '水质趋势图';
-          title.style.fontSize = '18px';
-          title.style.fontWeight = '700';
-          title.style.color = '#111827';
+          const topRow = document.createElement('div');
+          topRow.style.display = 'flex';
+          topRow.style.alignItems = 'center';
+          topRow.style.justifyContent = 'space-between';
+          topRow.style.gap = '10px';
+
+          const brand = document.createElement('div');
+          brand.style.display = 'flex';
+          brand.style.alignItems = 'center';
+          brand.style.gap = '10px';
+
+          const logoWrap = document.createElement('div');
+          logoWrap.style.width = '40px';
+          logoWrap.style.height = '40px';
+          logoWrap.style.borderRadius = '10px';
+          logoWrap.style.backgroundColor = '#2563eb';
+          logoWrap.style.display = 'flex';
+          logoWrap.style.alignItems = 'center';
+          logoWrap.style.justifyContent = 'center';
+
+          const logo = document.createElement('img');
+          logo.src = '/favicon.svg';
+          logo.alt = 'logo';
+          logo.style.width = '24px';
+          logo.style.height = '24px';
+          logo.style.display = 'block';
+
+          const brandText = document.createElement('img');
+          brandText.src = '/tangqianyan-text.svg';
+          brandText.alt = '塘前燕';
+          brandText.style.height = '22px';
+          brandText.style.display = 'block';
+
+          logoWrap.appendChild(logo);
+          brand.appendChild(logoWrap);
+          brand.appendChild(brandText);
+
+          const meta = document.createElement('div');
+          meta.style.display = 'flex';
+          meta.style.flexDirection = 'column';
+          meta.style.alignItems = 'flex-end';
+          meta.style.gap = '2px';
+          meta.style.fontSize = '12px';
+          meta.style.color = '#374151';
 
           const range = document.createElement('div');
           range.textContent = `${startText} ~ ${endText}`;
-          range.style.fontSize = '12px';
           range.style.fontWeight = '600';
-          range.style.color = '#6b7280';
-          range.style.padding = '6px 10px';
-          range.style.border = '1px solid #e5e7eb';
-          range.style.borderRadius = '8px';
 
+          const no = document.createElement('div');
+          no.textContent = `报告编号：${reportNo}  |  第${pageIndex + 1}/${totalPages}页`;
+
+          meta.appendChild(range);
+          meta.appendChild(no);
+
+          topRow.appendChild(brand);
+          topRow.appendChild(meta);
+
+          const title = document.createElement('div');
+          title.textContent = '智能养殖报告';
+          title.style.fontSize = '28px';
+          title.style.fontWeight = '800';
+          title.style.color = '#111827';
+          title.style.textAlign = 'center';
+          title.style.marginTop = '2px';
+
+          header.appendChild(topRow);
           header.appendChild(title);
-          header.appendChild(range);
+
+          if (pageIndex === 0) {
+            const blockTitle = document.createElement('div');
+            blockTitle.textContent = '基本信息';
+            blockTitle.style.fontSize = '14px';
+            blockTitle.style.fontWeight = '800';
+            blockTitle.style.color = '#111827';
+            blockTitle.style.marginTop = '4px';
+
+            const table = document.createElement('table');
+            table.style.width = '100%';
+            table.style.borderCollapse = 'collapse';
+            table.style.tableLayout = 'fixed';
+            table.style.fontSize = '13px';
+            table.style.color = '#111827';
+
+            const makeRow = (l1: string, v1: string, l2: string, v2: string) => {
+              const tr = document.createElement('tr');
+              const cells = [
+                { text: l1, isLabel: true },
+                { text: v1, isLabel: false },
+                { text: l2, isLabel: true },
+                { text: v2, isLabel: false },
+              ];
+              cells.forEach((c) => {
+                const td = document.createElement('td');
+                td.textContent = c.text || '-';
+                td.style.border = '1px solid #d1d5db';
+                td.style.padding = '7px 10px';
+                td.style.verticalAlign = 'middle';
+                td.style.wordBreak = 'break-all';
+                if (c.isLabel) {
+                  td.style.width = '14%';
+                  td.style.backgroundColor = '#f9fafb';
+                  td.style.color = '#374151';
+                  td.style.fontWeight = '700';
+                } else {
+                  td.style.width = '36%';
+                  td.style.fontWeight = '600';
+                }
+                tr.appendChild(td);
+              });
+              return tr;
+            };
+
+            const exportAt = fmt(new Date(), 'yyyy-MM-dd HH:mm');
+            const locationText = `${pond?.province || ''}${pond?.city || ''}${pond?.district || ''}` || '-';
+            const members = Array.isArray(pond?.groupInfo?.user_ids) ? pond.groupInfo!.user_ids : [];
+            const memberText =
+              members
+                .map((u) => String(u?.nickname || '').trim())
+                .filter(Boolean)
+                .join('、') || '-';
+
+            table.appendChild(makeRow('塘口名称', pond?.name || '-', '塘口成员', memberText));
+            table.appendChild(makeRow('养殖品种', pond?.breed_species || '-', '养殖方式', pond?.breed_type || '-'));
+            table.appendChild(makeRow('地理位置', locationText, '养殖面积', pond?.breed_area != null ? `${pond.breed_area}亩` : '-'));
+            table.appendChild(makeRow('最大水深', pond?.max_depth != null ? `${pond.max_depth}米` : '-', '导出时间', exportAt));
+
+            header.appendChild(blockTitle);
+            header.appendChild(table);
+          }
+
           return header;
         },
       });
@@ -687,7 +800,7 @@ const PondDetail = () => {
                     : 'border-blue-600 text-blue-600 hover:bg-blue-50'
                 }`}
               >
-                 {exportingTrendPdf ? '生成中...' : '水质趋势图导出'}
+                 {exportingTrendPdf ? '生成中...' : '报告导出'}
               </button>
               <button onClick={handleExport} disabled={exporting} className={`w-full border rounded-lg py-2.5 font-bold transition-colors flex items-center justify-center gap-2 ${exporting ? 'border-gray-300 text-gray-400 cursor-not-allowed' : 'border-gray-900 text-gray-900 hover:bg-gray-50'}`}>
                  {exporting ? '导出中...' : '数据导出'}

@@ -183,7 +183,6 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
             data={specificData}
             dataKey={key}
             domain={domain}
-            values={values}
             width={dynamicWidth}
             yAxisWidth={uniformYAxisWidth}
           />
@@ -198,13 +197,22 @@ interface SingleChartProps {
   data: any[];
   dataKey: string;
   domain: [number | 'auto', number | 'auto'];
-  values: number[];
   width: number;
   yAxisWidth: number;
 }
 
-const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain, values, width, yAxisWidth }) => {
+const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain, width, yAxisWidth }) => {
   const [hoverData, setHoverData] = React.useState<{ y: number, value: number } | null>(null);
+  const [activeIndex, setActiveIndex] = React.useState<number>(() => Math.max(0, (data?.length || 0) - 1));
+
+  React.useEffect(() => {
+    if (!data || data.length === 0) {
+      setActiveIndex(0);
+      return;
+    }
+    setActiveIndex(data.length - 1);
+  }, [data]);
+
   const formatYAxisTick = React.useCallback((val: number) => {
     if (typeof val !== 'number' || isNaN(val)) return '';
     const smallKeys = ['nitrite', 'ammonia', 'oxygen'];
@@ -238,11 +246,32 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
        
        setHoverData({ y, value });
     }
+    if (e && typeof e.activeTooltipIndex === 'number' && !isNaN(e.activeTooltipIndex)) {
+      setActiveIndex(e.activeTooltipIndex);
+    }
   };
 
   const handleMouseLeave = () => {
     setHoverData(null);
+    setActiveIndex(Math.max(0, (data?.length || 0) - 1));
   };
+
+  const renderDot = React.useCallback((props: any) => {
+    const { cx, cy, index } = props;
+    if (cx == null || cy == null) return null;
+    const r = index === activeIndex ? 4 : 3;
+    const fill = index === activeIndex ? config.color : '#ffffff';
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        stroke={config.color}
+        strokeWidth={2}
+        fill={fill}
+      />
+    );
+  }, [activeIndex, config.color]);
 
   return (
     <div 
@@ -281,6 +310,8 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
            margin={{ top: 5, right: 30, left: 0, bottom: 18 }}
            onMouseMove={handleMouseMove}
            onMouseLeave={handleMouseLeave}
+           onTouchMove={handleMouseMove}
+           onTouchEnd={handleMouseLeave}
          >
            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
            <XAxis 
@@ -320,8 +351,8 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
              dataKey={dataKey}
              stroke={config.color}
              strokeWidth={2}
-             dot={false}
-             activeDot={{ r: 6 }}
+             dot={renderDot}
+             activeDot={false}
              name={config.name}
              unit={config.unit}
              animationDuration={1000}
