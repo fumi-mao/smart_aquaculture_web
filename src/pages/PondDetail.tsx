@@ -96,6 +96,8 @@ const PondDetail = () => {
   const [exporting, setExporting] = useState(false);
   const [exportingTrendPdf, setExportingTrendPdf] = useState(false);
   const trendExportRef = useRef<HTMLDivElement | null>(null);
+  const trendPdfRenderRef = useRef<HTMLDivElement | null>(null);
+  const [renderTrendPdf, setRenderTrendPdf] = useState(false);
   
   // Records State
   const [records, setRecords] = useState<FarmingRecord[]>([]);
@@ -369,13 +371,18 @@ const PondDetail = () => {
 
     setExportingTrendPdf(true);
     try {
+      setRenderTrendPdf(true);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) => setTimeout(() => resolve(), 80));
+
       const name = sanitizeFilenamePart(pond?.name || 'pond');
       const start = dateRange?.startDate ? format(dateRange.startDate, 'yyyyMMdd') : 'start';
       const end = dateRange?.endDate ? format(dateRange.endDate, 'yyyyMMdd') : 'end';
       const ts = fmt(new Date(), 'yyyyMMdd_HHmm');
       const filename = `${name}_${id}_${start}-${end}_智能养殖报告_${ts}.pdf`;
 
-      const el = trendExportRef.current;
+      const el = trendPdfRenderRef.current || trendExportRef.current;
       const items = Array.from(el.querySelectorAll('[data-trend-export-item="true"]')) as HTMLElement[];
       const startText = dateRange?.startDate ? format(dateRange.startDate, 'yyyy-MM-dd') : '--';
       const endText = dateRange?.endDate ? format(dateRange.endDate, 'yyyy-MM-dd') : '--';
@@ -386,10 +393,10 @@ const PondDetail = () => {
         orientation: 'portrait',
         format: 'a4',
         marginPt: 0,
-        itemsPerPage: ({ pageIndex }) => (pageIndex === 0 ? 2 : 3),
+        itemsPerPage: ({ pageIndex }) => (pageIndex === 0 ? 3 : 4),
         ignoreSelector: '[data-export-ignore="true"]',
-        wrapperWidthPx: 760,
-        chartHeightPx: ({ pageIndex }) => (pageIndex === 0 ? 300 : 260),
+        wrapperWidthPx: 780,
+        chartHeightPx: ({ pageIndex }) => (pageIndex === 0 ? 250 : 230),
         watermarkText: '塘前燕数据验证中心',
         watermarkOpacity: 0.12,
         watermarkFontSizePx: 26,
@@ -446,7 +453,7 @@ const PondDetail = () => {
           meta.style.flexDirection = 'column';
           meta.style.alignItems = 'flex-end';
           meta.style.gap = '2px';
-          meta.style.fontSize = '12px';
+          meta.style.fontSize = '13px';
           meta.style.color = '#374151';
 
           const range = document.createElement('div');
@@ -464,7 +471,7 @@ const PondDetail = () => {
 
           const title = document.createElement('div');
           title.textContent = '智能养殖报告';
-          title.style.fontSize = '28px';
+          title.style.fontSize = '32px';
           title.style.fontWeight = '800';
           title.style.color = '#111827';
           title.style.textAlign = 'center';
@@ -476,7 +483,7 @@ const PondDetail = () => {
           if (pageIndex === 0) {
             const blockTitle = document.createElement('div');
             blockTitle.textContent = '基本信息';
-            blockTitle.style.fontSize = '14px';
+            blockTitle.style.fontSize = '16px';
             blockTitle.style.fontWeight = '800';
             blockTitle.style.color = '#111827';
             blockTitle.style.marginTop = '4px';
@@ -485,7 +492,7 @@ const PondDetail = () => {
             table.style.width = '100%';
             table.style.borderCollapse = 'collapse';
             table.style.tableLayout = 'fixed';
-            table.style.fontSize = '13px';
+            table.style.fontSize = '14px';
             table.style.color = '#111827';
 
             const makeRow = (l1: string, v1: string, l2: string, v2: string) => {
@@ -500,7 +507,7 @@ const PondDetail = () => {
                 const td = document.createElement('td');
                 td.textContent = c.text || '-';
                 td.style.border = '1px solid #d1d5db';
-                td.style.padding = '7px 10px';
+                td.style.padding = '9px 12px';
                 td.style.verticalAlign = 'middle';
                 td.style.wordBreak = 'break-all';
                 if (c.isLabel) {
@@ -539,6 +546,7 @@ const PondDetail = () => {
         },
       });
     } finally {
+      setRenderTrendPdf(false);
       setExportingTrendPdf(false);
     }
   };
@@ -808,6 +816,25 @@ const PondDetail = () => {
            </div>
         </div>
       </div>
+
+      {renderTrendPdf && (
+        <div
+          ref={trendPdfRenderRef}
+          className="pointer-events-none"
+          style={{
+            position: 'fixed',
+            left: '-100000px',
+            top: 0,
+            width: '780px',
+            padding: '16px',
+            boxSizing: 'border-box',
+            backgroundColor: '#ffffff',
+            visibility: 'hidden',
+          }}
+        >
+          <TrendChart data={trendData} loading={trendLoading} exportMode />
+        </div>
+      )}
     </div>
   );
 };

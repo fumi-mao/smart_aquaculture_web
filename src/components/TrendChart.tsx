@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 interface TrendChartProps {
   data: any[];
   loading: boolean;
+  exportMode?: boolean;
 }
 
 // 参数配置映射表：将后端字段映射为中文名称、单位和颜色
@@ -47,7 +48,7 @@ const PARAM_CONFIG: Record<string, { name: string; unit: string; color: string }
  *   3. 为每个参数渲染一个独立的折线图
  *   4. 所有折线图通过 syncId 保持交互同步（Tooltip同步）
  */
-const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
+const TrendChart: React.FC<TrendChartProps> = ({ data, loading, exportMode = false }) => {
   if (loading) {
     return <div className="h-full flex items-center justify-center text-gray-400">加载中...</div>;
   }
@@ -101,14 +102,7 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
   }
 
   // 3. 渲染图表
-  
-  // Calculate dynamic width based on data length to support horizontal scrolling
-  // Assume each data point needs at least 30px space (or adjust as needed)
-  // But maintain a minimum width of 100% or a fixed pixel value
-  const minWidth = 1200; // Increase base minimum width
-  const pointWidth = 20; // Width per data point
-  // const dynamicWidth = Math.max(minWidth, processedData.length * pointWidth);
-  
+
   const smallKeysSet = new Set(['nitrite', 'ammonia', 'oxygen']);
   const formatTickPreview = (val: number, key: string, unit: string) => {
     const decimals = smallKeysSet.has(key) ? 3 : 2;
@@ -120,10 +114,9 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
     const maxV = typeof domain[1] === 'number' ? domain[1] : (values.length ? Math.max(...values) : 0);
     const samples = [minV, maxV].map(v => formatTickPreview(v, key, unit));
     const longest = Math.max(...samples.map(s => (s ? s.length : 0)));
-    return Math.min(140, Math.max(60, 36 + longest * 7));
+    return Math.min(110, Math.max(52, 22 + longest * 6));
   };
   const yAxisWidthPerKey: Record<string, number> = {};
-  const widthCandidates: number[] = [];
   activeKeys.forEach(k => {
     const cfg = PARAM_CONFIG[k];
     const vals = processedData.map(d => d[k]).filter(v => v !== null && v !== undefined) as number[];
@@ -144,12 +137,12 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
     }
     const w = computeYAxisWidth(k, cfg.unit, vals, domain);
     yAxisWidthPerKey[k] = w;
-    widthCandidates.push(w);
   });
-  const uniformYAxisWidth = widthCandidates.length ? Math.max(...widthCandidates) : 60;
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto custom-scrollbar gap-8 pr-2 pb-4 overflow-x-auto">
+    <div
+      className={`flex flex-col ${exportMode ? 'h-auto overflow-visible pr-0 pb-0' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-4'} gap-8`}
+    >
       {activeKeys.map((key, index) => {
         const config = PARAM_CONFIG[key];
         
@@ -172,9 +165,7 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
               domain = [minVal - padding, maxVal + padding];
            }
         }
-        
-        // 为该图表单独计算宽度
-        const dynamicWidth = Math.max(minWidth, specificData.length * pointWidth);
+        const yAxisWidth = yAxisWidthPerKey[key] || 60;
 
         return (
           <SingleChart 
@@ -183,8 +174,8 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
             data={specificData}
             dataKey={key}
             domain={domain}
-            width={dynamicWidth}
-            yAxisWidth={uniformYAxisWidth}
+            yAxisWidth={yAxisWidth}
+            exportMode={exportMode}
           />
         );
       })}
@@ -197,21 +188,32 @@ interface SingleChartProps {
   data: any[];
   dataKey: string;
   domain: [number | 'auto', number | 'auto'];
-  width: number;
   yAxisWidth: number;
+  exportMode?: boolean;
 }
 
-const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain, width, yAxisWidth }) => {
+const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain, yAxisWidth, exportMode = false }) => {
   const [hoverData, setHoverData] = React.useState<{ y: number, value: number } | null>(null);
-  const [activeIndex, setActiveIndex] = React.useState<number>(() => Math.max(0, (data?.length || 0) - 1));
+  const [activeIndex, setActiveIndex] = React.useState<number>(-1);
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = React.useState<number>(0);
 
   React.useEffect(() => {
-    if (!data || data.length === 0) {
-      setActiveIndex(0);
-      return;
-    }
-    setActiveIndex(data.length - 1);
+    setHoverData(null);
+    setActiveIndex(-1);
   }, [data]);
+
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const update = () => setContainerWidth(el.getBoundingClientRect().width || 0);
+    update();
+
+    const ro = new ResizeObserver(() => update());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const formatYAxisTick = React.useCallback((val: number) => {
     if (typeof val !== 'number' || isNaN(val)) return '';
@@ -220,6 +222,160 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
     const n = Number(val.toFixed(decimals));
     return config.unit ? `${n}${config.unit}` : `${n}`;
   }, [dataKey, config.unit]);
+
+  const tickPlan = React.useMemo(() => {
+    const times = (data || []).map((d) => d?.time).filter(Boolean) as string[];
+    const uniqueTimes = Array.from(new Set(times));
+    const count = uniqueTimes.length;
+    const safeWidth = Number.isFinite(containerWidth) ? containerWidth : 0;
+    const chartMarginRight = 44;
+    const plotWidth = Math.max(0, safeWidth - Math.max(0, yAxisWidth) - chartMarginRight - 18);
+    const fontFamily =
+      'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+
+    const formatSingle = (str: string) => {
+      try {
+        return format(new Date(str), 'MM-dd HH:mm');
+      } catch {
+        return String(str || '');
+      }
+    };
+    const formatDouble = (str: string) => {
+      try {
+        return [format(new Date(str), 'HH:mm'), format(new Date(str), 'MM-dd')] as const;
+      } catch {
+        const s = String(str || '');
+        return [s, ''] as const;
+      }
+    };
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const measure = (text: string, fontSize: number) => {
+      if (!ctx) return text.length * fontSize * 0.55;
+      ctx.font = `${fontSize}px ${fontFamily}`;
+      return ctx.measureText(text).width;
+    };
+
+    type Candidate = { mode: 'single' | 'double'; fontSize: number; angle: number };
+    const candidates: Candidate[] = [
+      { mode: 'double', fontSize: 11, angle: 0 },
+      { mode: 'double', fontSize: 10, angle: 0 },
+      { mode: 'double', fontSize: 10, angle: -35 },
+      ...(exportMode ? [{ mode: 'double' as const, fontSize: 9, angle: -45 }] : []),
+      { mode: 'single', fontSize: 9, angle: -45 },
+    ];
+
+    const resolve = (cand: Candidate) => {
+      const rad = (Math.abs(cand.angle) * Math.PI) / 180;
+      const lineHeight = cand.fontSize * 1.15;
+      const labelHeight = (cand.mode === 'double' ? lineHeight * 2 : lineHeight) + 4;
+      const baseWidths = uniqueTimes.map((t) => {
+        if (cand.mode === 'double') {
+          const [a, b] = formatDouble(t);
+          return Math.max(measure(a, cand.fontSize), measure(b, cand.fontSize));
+        }
+        return measure(formatSingle(t), cand.fontSize);
+      });
+      const maxW = baseWidths.length ? Math.max(...baseWidths) : 0;
+      const widthEff = cand.angle === 0 ? maxW : maxW * Math.cos(rad) + labelHeight * Math.sin(rad);
+      const gap = exportMode ? Math.max(6, Math.round(cand.fontSize * 0.55)) : Math.max(8, Math.round(cand.fontSize * 0.7));
+      const perTick = Math.max(10, widthEff + gap);
+      const maxTicks = plotWidth > 0 ? Math.max(2, Math.floor(plotWidth / perTick)) : 2;
+      const showAll = count <= maxTicks;
+
+      const halfPad = exportMode
+        ? Math.min(90, Math.max(10, Math.ceil(widthEff / 2) + 6))
+        : Math.min(120, Math.max(12, Math.ceil(widthEff / 2) + 10));
+      const height = cand.angle === 0 ? (cand.mode === 'double' ? 52 : 40) : exportMode ? 66 : 70;
+
+      if (showAll || count <= 2) {
+        return {
+          ...cand,
+          ticks: undefined as string[] | undefined,
+          padding: { left: halfPad, right: halfPad },
+          height,
+        };
+      }
+
+      const step = Math.max(1, Math.ceil((count - 1) / (maxTicks - 1)));
+      const selected: string[] = [];
+      for (let i = 0; i < count; i += step) selected.push(uniqueTimes[i]);
+      const last = uniqueTimes[count - 1];
+      if (selected[selected.length - 1] !== last) selected.push(last);
+
+      return {
+        ...cand,
+        ticks: selected,
+        padding: { left: halfPad, right: halfPad },
+        height,
+      };
+    };
+
+    for (const cand of candidates) {
+      const plan = resolve(cand);
+      if (!plan.ticks) return plan;
+    }
+
+    return resolve(candidates[candidates.length - 1]);
+  }, [containerWidth, data, yAxisWidth, exportMode]);
+
+  const CustomXAxisTick = React.useCallback((props: any) => {
+    const { x, y, payload } = props;
+    const value = payload?.value;
+    const fontSize = tickPlan.fontSize;
+    const fill = '#6b7280';
+    const fontFamily =
+      'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+
+    const makeSingle = () => {
+      try {
+        return format(new Date(value), 'MM-dd HH:mm');
+      } catch {
+        return String(value || '');
+      }
+    };
+    const makeDouble = () => {
+      try {
+        return [format(new Date(value), 'HH:mm'), format(new Date(value), 'MM-dd')] as const;
+      } catch {
+        const s = String(value || '');
+        return [s, ''] as const;
+      }
+    };
+
+    if (tickPlan.mode === 'double') {
+      const [a, b] = makeDouble();
+      const transform = tickPlan.angle ? `rotate(${tickPlan.angle}, ${x}, ${y})` : undefined;
+      const anchor = tickPlan.angle ? 'end' : 'middle';
+      const dx = tickPlan.angle ? -4 : 0;
+      return (
+        <g transform={transform}>
+          <text x={x + dx} y={y} textAnchor={anchor} fill={fill} fontSize={fontSize} fontFamily={fontFamily}>
+            <tspan x={x + dx} dy="0">{a}</tspan>
+            <tspan x={x + dx} dy={fontSize * 1.15}>{b}</tspan>
+          </text>
+        </g>
+      );
+    }
+
+    const text = makeSingle();
+    if (tickPlan.angle) {
+      return (
+        <g transform={`rotate(${tickPlan.angle}, ${x}, ${y})`}>
+          <text x={x - 4} y={y} textAnchor="end" fill={fill} fontSize={fontSize} fontFamily={fontFamily}>
+            {text}
+          </text>
+        </g>
+      );
+    }
+
+    return (
+      <text x={x} y={y} textAnchor="middle" fill={fill} fontSize={fontSize} fontFamily={fontFamily}>
+        {text}
+      </text>
+    );
+  }, [tickPlan]);
 
   const handleMouseMove = (e: any) => {
     if (e && e.activeCoordinate && e.activeCoordinate.y) {
@@ -253,14 +409,15 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
 
   const handleMouseLeave = () => {
     setHoverData(null);
-    setActiveIndex(Math.max(0, (data?.length || 0) - 1));
+    setActiveIndex(-1);
   };
 
   const renderDot = React.useCallback((props: any) => {
     const { cx, cy, index } = props;
     if (cx == null || cy == null) return null;
-    const r = index === activeIndex ? 4 : 3;
-    const fill = index === activeIndex ? config.color : '#ffffff';
+    const isActive = activeIndex >= 0 && index === activeIndex;
+    const r = isActive ? 4 : 3;
+    const fill = isActive ? config.color : '#ffffff';
     return (
       <circle
         cx={cx}
@@ -273,13 +430,30 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
     );
   }, [activeIndex, config.color]);
 
+  const renderActiveDot = React.useCallback((props: any) => {
+    const { cx, cy } = props;
+    if (cx == null || cy == null) return null;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={4}
+        stroke={config.color}
+        strokeWidth={2}
+        fill={config.color}
+      />
+    );
+  }, [config.color]);
+
   return (
     <div 
+      ref={containerRef}
       className="h-[200px] shrink-0 relative outline-none chart-no-outline"
-      style={{ minWidth: width, width: '100%' }}
+      style={{ width: '100%' }}
       data-trend-export-item="true"
+      data-trend-point-count={data?.length || 0}
     >
-       <div className="mb-2 ml-10 text-sm font-bold text-gray-700 flex items-center gap-2">
+       <div className="mb-2 ml-10 text-sm font-bold text-gray-700 flex items-center gap-2" data-trend-title-row="true">
           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }}></span>
           {config.name}
        </div>
@@ -307,7 +481,7 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
        <ResponsiveContainer width="100%" height="100%">
          <LineChart
            data={data}
-           margin={{ top: 5, right: 30, left: 0, bottom: 18 }}
+           margin={{ top: 5, right: 44, left: 0, bottom: 18 }}
            onMouseMove={handleMouseMove}
            onMouseLeave={handleMouseLeave}
            onTouchMove={handleMouseMove}
@@ -316,18 +490,14 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
            <XAxis 
               dataKey="time" 
-              tickFormatter={(str) => {
-                  try {
-                      return format(new Date(str), 'MM-dd HH:mm');
-                  } catch {
-                      return str;
-                  }
-              }}
-              tick={{ fontSize: 12, fill: '#6b7280' }}
+              ticks={tickPlan.ticks}
+              interval={0}
+              tick={CustomXAxisTick as any}
               axisLine={{ stroke: '#e5e7eb' }}
               tickLine={{ stroke: '#e5e7eb' }}
-              minTickGap={30}
-              height={36}
+              height={tickPlan.height}
+              padding={tickPlan.padding}
+              tickMargin={6}
            />
           <YAxis 
              orientation="left" 
@@ -346,20 +516,21 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
               cursor={{ strokeDasharray: '3 3', stroke: '#9ca3af' }}
            />
-           <Line
+          <Line
              type="monotone"
              dataKey={dataKey}
              stroke={config.color}
              strokeWidth={2}
              dot={renderDot}
-             activeDot={false}
+             activeDot={renderActiveDot as any}
              name={config.name}
              unit={config.unit}
-             animationDuration={1000}
-             connectNulls={false} // 不连接断点
+             isAnimationActive={!exportMode}
+             animationDuration={exportMode ? 0 : 1000}
+             connectNulls={exportMode ? true : false} // 导出时优先连线，避免视觉断裂
            />
-         </LineChart>
-       </ResponsiveContainer>
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   );
 };

@@ -250,6 +250,7 @@ export async function downloadPagedElementsAsPdf({
   for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
     const pageItems = pages[pageIndex] || [];
     if (pageItems.length === 0) continue;
+    const resolvedWrapperWidthPx = Math.min(980, Math.max(480, Math.round(wrapperWidthPx)));
 
     const wrapper = document.createElement('div');
     wrapper.style.position = 'fixed';
@@ -258,44 +259,63 @@ export async function downloadPagedElementsAsPdf({
     wrapper.style.zIndex = '-1';
     wrapper.style.backgroundColor = backgroundColor;
     wrapper.style.padding = '6px 10px';
-    wrapper.style.width = `${wrapperWidthPx}px`;
+    wrapper.style.width = `${resolvedWrapperWidthPx}px`;
     wrapper.style.boxSizing = 'border-box';
     wrapper.style.display = 'flex';
     wrapper.style.flexDirection = 'column';
     wrapper.style.gap = '10px';
     wrapper.style.overflow = 'hidden';
-    const minHeightPx = Math.max(1, Math.round(wrapperWidthPx * (contentHeight / contentWidth)));
+    const minHeightPx = Math.max(1, Math.round(resolvedWrapperWidthPx * (contentHeight / contentWidth)));
     wrapper.style.minHeight = `${minHeightPx}px`;
 
     if (watermarkText) {
       const wm = document.createElement('div');
       wm.style.position = 'absolute';
-      wm.style.left = '0';
-      wm.style.top = '0';
-      wm.style.right = '0';
-      wm.style.bottom = '0';
+      wm.style.left = '-20%';
+      wm.style.top = '-20%';
+      wm.style.width = '140%';
+      wm.style.height = '140%';
       wm.style.zIndex = '0';
       wm.style.pointerEvents = 'none';
       wm.style.userSelect = 'none';
-      wm.style.opacity = `${watermarkOpacity}`;
-      wm.style.transform = `rotate(${watermarkRotateDeg}deg)`;
-      wm.style.transformOrigin = 'center';
-      wm.style.display = 'flex';
-      wm.style.flexWrap = 'wrap';
-      wm.style.alignContent = 'flex-start';
-      wm.style.justifyContent = 'center';
-      wm.style.gap = `${watermarkGapPx}px`;
-      wm.style.padding = '60px';
-      wm.style.color = '#9ca3af';
-      wm.style.fontSize = `${watermarkFontSizePx}px`;
-      wm.style.fontWeight = '700';
-      wm.style.lineHeight = '1';
+      wm.style.opacity = '1';
+      wm.style.backgroundRepeat = 'repeat';
+      wm.style.backgroundPosition = '0 0';
 
-      const count = 120;
-      for (let i = 0; i < count; i++) {
-        const span = document.createElement('span');
-        span.textContent = watermarkText;
-        wm.appendChild(span);
+      const tileCanvas = document.createElement('canvas');
+      const ctx = tileCanvas.getContext('2d');
+      if (ctx) {
+        const fontWeight = 700;
+        const fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+        ctx.font = `${fontWeight} ${watermarkFontSizePx}px ${fontFamily}`;
+        const metrics = ctx.measureText(watermarkText);
+        const textW = Math.max(1, Math.ceil(metrics.width));
+        const tileW = Math.max(220, textW + watermarkGapPx * 2);
+        const tileH = Math.max(160, Math.ceil(watermarkFontSizePx * 2.4 + watermarkGapPx * 1.4));
+        tileCanvas.width = tileW;
+        tileCanvas.height = tileH;
+
+        ctx.clearRect(0, 0, tileW, tileH);
+        ctx.font = `${fontWeight} ${watermarkFontSizePx}px ${fontFamily}`;
+        ctx.fillStyle = '#9ca3af';
+        ctx.globalAlpha = Math.max(0, Math.min(1, watermarkOpacity));
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        const rad = (Number(watermarkRotateDeg) || 0) * (Math.PI / 180);
+        const draw = (x: number, y: number) => {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(rad);
+          ctx.fillText(watermarkText, 0, 0);
+          ctx.restore();
+        };
+
+        draw(tileW * 0.28, tileH * 0.32);
+        draw(tileW * 0.78, tileH * 0.82);
+
+        wm.style.backgroundImage = `url(${tileCanvas.toDataURL('image/png')})`;
+        wm.style.backgroundSize = `${tileW}px ${tileH}px`;
       }
 
       wrapper.appendChild(wm);
@@ -323,6 +343,29 @@ export async function downloadPagedElementsAsPdf({
         n.style.width = '100%';
         n.style.height = `${getChartHeightPx(pageIndex)}px`;
       });
+      const chartSvgs = cloned.querySelectorAll('.recharts-wrapper svg');
+      chartSvgs.forEach((node) => {
+        const svg = node as SVGElement;
+        const wRaw = svg.getAttribute('width');
+        const hRaw = svg.getAttribute('height');
+        const w = wRaw ? Number.parseFloat(wRaw) : NaN;
+        const h = hRaw ? Number.parseFloat(hRaw) : NaN;
+        if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+          if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+          if (!svg.getAttribute('preserveAspectRatio')) svg.setAttribute('preserveAspectRatio', 'xMinYMin meet');
+          svg.removeAttribute('width');
+          svg.removeAttribute('height');
+          (svg as any).style.width = '100%';
+          (svg as any).style.height = '100%';
+          (svg as any).style.display = 'block';
+        }
+      });
+      const titleRow = cloned.querySelector('[data-trend-title-row="true"]') as HTMLElement | null;
+      if (titleRow) {
+        titleRow.style.marginLeft = '0';
+        titleRow.style.marginRight = '0';
+        titleRow.style.justifyContent = 'center';
+      }
       wrapper.appendChild(cloned);
     });
 
