@@ -8,6 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test": "vite preview",
+    "prod": "vite preview",
     "check": "tsc -b --noEmit"
   },
   "dependencies": {

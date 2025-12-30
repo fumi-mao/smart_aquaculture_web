@@ -6,6 +6,19 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+const proxyConfig = {
+  '/api': {
+    target: 'https://api.pondrobotics.com',
+    changeOrigin: true,
+    secure: false,
+  },
+  '/oauth': {
+    target: 'https://api.pondrobotics.com',
+    changeOrigin: true,
+    secure: false,
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -15,17 +28,9 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: {
-      '/api': {
-        target: 'https://api.pondrobotics.com',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/oauth': {
-        target: 'https://api.pondrobotics.com',
-        changeOrigin: true,
-        secure: false,
-      }
-    }
+    proxy: proxyConfig
+  },
+  preview: {
+    proxy: proxyConfig
   }
 })
