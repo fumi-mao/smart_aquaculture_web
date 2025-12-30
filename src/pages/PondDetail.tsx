@@ -96,8 +96,6 @@ const PondDetail = () => {
   const [exporting, setExporting] = useState(false);
   const [exportingTrendPdf, setExportingTrendPdf] = useState(false);
   const trendExportRef = useRef<HTMLDivElement | null>(null);
-  const trendPdfRenderRef = useRef<HTMLDivElement | null>(null);
-  const [renderTrendPdf, setRenderTrendPdf] = useState(false);
   
   // Records State
   const [records, setRecords] = useState<FarmingRecord[]>([]);
@@ -371,18 +369,13 @@ const PondDetail = () => {
 
     setExportingTrendPdf(true);
     try {
-      setRenderTrendPdf(true);
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      await new Promise<void>((resolve) => setTimeout(() => resolve(), 80));
-
       const name = sanitizeFilenamePart(pond?.name || 'pond');
       const start = dateRange?.startDate ? format(dateRange.startDate, 'yyyyMMdd') : 'start';
       const end = dateRange?.endDate ? format(dateRange.endDate, 'yyyyMMdd') : 'end';
       const ts = fmt(new Date(), 'yyyyMMdd_HHmm');
       const filename = `${name}_${id}_${start}-${end}_智能养殖报告_${ts}.pdf`;
 
-      const el = trendPdfRenderRef.current || trendExportRef.current;
+      const el = trendExportRef.current;
       const items = Array.from(el.querySelectorAll('[data-trend-export-item="true"]')) as HTMLElement[];
       const startText = dateRange?.startDate ? format(dateRange.startDate, 'yyyy-MM-dd') : '--';
       const endText = dateRange?.endDate ? format(dateRange.endDate, 'yyyy-MM-dd') : '--';
@@ -546,7 +539,6 @@ const PondDetail = () => {
         },
       });
     } finally {
-      setRenderTrendPdf(false);
       setExportingTrendPdf(false);
     }
   };
@@ -816,25 +808,6 @@ const PondDetail = () => {
            </div>
         </div>
       </div>
-
-      {renderTrendPdf && (
-        <div
-          ref={trendPdfRenderRef}
-          className="pointer-events-none"
-          style={{
-            position: 'fixed',
-            left: '-100000px',
-            top: 0,
-            width: '780px',
-            padding: '16px',
-            boxSizing: 'border-box',
-            backgroundColor: '#ffffff',
-            visibility: 'hidden',
-          }}
-        >
-          <TrendChart data={trendData} loading={trendLoading} exportMode />
-        </div>
-      )}
     </div>
   );
 };

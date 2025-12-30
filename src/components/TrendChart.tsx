@@ -5,7 +5,6 @@ import { format } from 'date-fns';
 interface TrendChartProps {
   data: any[];
   loading: boolean;
-  exportMode?: boolean;
 }
 
 // 参数配置映射表：将后端字段映射为中文名称、单位和颜色
@@ -48,7 +47,7 @@ const PARAM_CONFIG: Record<string, { name: string; unit: string; color: string }
  *   3. 为每个参数渲染一个独立的折线图
  *   4. 所有折线图通过 syncId 保持交互同步（Tooltip同步）
  */
-const TrendChart: React.FC<TrendChartProps> = ({ data, loading, exportMode = false }) => {
+const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
   if (loading) {
     return <div className="h-full flex items-center justify-center text-gray-400">加载中...</div>;
   }
@@ -140,9 +139,7 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading, exportMode = fal
   });
 
   return (
-    <div
-      className={`flex flex-col ${exportMode ? 'h-auto overflow-visible pr-0 pb-0' : 'h-full overflow-y-auto custom-scrollbar pr-2 pb-4'} gap-8`}
-    >
+    <div className="flex flex-col h-full overflow-y-auto custom-scrollbar gap-8 pr-2 pb-4">
       {activeKeys.map((key, index) => {
         const config = PARAM_CONFIG[key];
         
@@ -175,7 +172,6 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading, exportMode = fal
             dataKey={key}
             domain={domain}
             yAxisWidth={yAxisWidth}
-            exportMode={exportMode}
           />
         );
       })}
@@ -189,17 +185,15 @@ interface SingleChartProps {
   dataKey: string;
   domain: [number | 'auto', number | 'auto'];
   yAxisWidth: number;
-  exportMode?: boolean;
 }
 
-const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain, yAxisWidth, exportMode = false }) => {
+const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain, yAxisWidth }) => {
   const [hoverData, setHoverData] = React.useState<{ y: number, value: number } | null>(null);
   const [activeIndex, setActiveIndex] = React.useState<number>(-1);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = React.useState<number>(0);
 
   React.useEffect(() => {
-    setHoverData(null);
     setActiveIndex(-1);
   }, [data]);
 
@@ -228,8 +222,7 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
     const uniqueTimes = Array.from(new Set(times));
     const count = uniqueTimes.length;
     const safeWidth = Number.isFinite(containerWidth) ? containerWidth : 0;
-    const chartMarginRight = 44;
-    const plotWidth = Math.max(0, safeWidth - Math.max(0, yAxisWidth) - chartMarginRight - 18);
+    const plotWidth = Math.max(0, safeWidth - (Math.max(0, yAxisWidth) + 24));
     const fontFamily =
       'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -262,8 +255,6 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
       { mode: 'double', fontSize: 11, angle: 0 },
       { mode: 'double', fontSize: 10, angle: 0 },
       { mode: 'double', fontSize: 10, angle: -35 },
-      ...(exportMode ? [{ mode: 'double' as const, fontSize: 9, angle: -45 }] : []),
-      { mode: 'single', fontSize: 9, angle: -45 },
     ];
 
     const resolve = (cand: Candidate) => {
@@ -279,15 +270,13 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
       });
       const maxW = baseWidths.length ? Math.max(...baseWidths) : 0;
       const widthEff = cand.angle === 0 ? maxW : maxW * Math.cos(rad) + labelHeight * Math.sin(rad);
-      const gap = exportMode ? Math.max(6, Math.round(cand.fontSize * 0.55)) : Math.max(8, Math.round(cand.fontSize * 0.7));
+      const gap = Math.max(8, Math.round(cand.fontSize * 0.7));
       const perTick = Math.max(10, widthEff + gap);
       const maxTicks = plotWidth > 0 ? Math.max(2, Math.floor(plotWidth / perTick)) : 2;
       const showAll = count <= maxTicks;
 
-      const halfPad = exportMode
-        ? Math.min(90, Math.max(10, Math.ceil(widthEff / 2) + 6))
-        : Math.min(120, Math.max(12, Math.ceil(widthEff / 2) + 10));
-      const height = cand.angle === 0 ? (cand.mode === 'double' ? 52 : 40) : exportMode ? 66 : 70;
+      const halfPad = Math.min(120, Math.max(12, Math.ceil(widthEff / 2) + 10));
+      const height = cand.angle === 0 ? (cand.mode === 'double' ? 52 : 40) : 70;
 
       if (showAll || count <= 2) {
         return {
@@ -318,7 +307,7 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
     }
 
     return resolve(candidates[candidates.length - 1]);
-  }, [containerWidth, data, yAxisWidth, exportMode]);
+  }, [containerWidth, data, yAxisWidth]);
 
   const CustomXAxisTick = React.useCallback((props: any) => {
     const { x, y, payload } = props;
@@ -430,21 +419,6 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
     );
   }, [activeIndex, config.color]);
 
-  const renderActiveDot = React.useCallback((props: any) => {
-    const { cx, cy } = props;
-    if (cx == null || cy == null) return null;
-    return (
-      <circle
-        cx={cx}
-        cy={cy}
-        r={4}
-        stroke={config.color}
-        strokeWidth={2}
-        fill={config.color}
-      />
-    );
-  }, [config.color]);
-
   return (
     <div 
       ref={containerRef}
@@ -516,21 +490,20 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
               cursor={{ strokeDasharray: '3 3', stroke: '#9ca3af' }}
            />
-          <Line
+           <Line
              type="monotone"
              dataKey={dataKey}
              stroke={config.color}
              strokeWidth={2}
              dot={renderDot}
-             activeDot={renderActiveDot as any}
+             activeDot={false}
              name={config.name}
              unit={config.unit}
-             isAnimationActive={!exportMode}
-             animationDuration={exportMode ? 0 : 1000}
-             connectNulls={exportMode ? true : false} // 导出时优先连线，避免视觉断裂
+             animationDuration={1000}
+             connectNulls={false} // 不连接断点
            />
-        </LineChart>
-      </ResponsiveContainer>
+         </LineChart>
+       </ResponsiveContainer>
     </div>
   );
 };

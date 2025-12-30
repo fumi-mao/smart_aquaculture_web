@@ -20,6 +20,11 @@ export default defineConfig({
         target: 'https://api.pondrobotics.com',
         changeOrigin: true,
         secure: false,
+      },
+      '/oauth': {
+        target: 'https://api.pondrobotics.com',
+        changeOrigin: true,
+        secure: false,
       }
     }
   }
