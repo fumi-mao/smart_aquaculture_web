@@ -123,7 +123,7 @@ const Login = () => {
 
       {/* Logo & Brand */}
       <div className="z-10 flex flex-col items-center mb-6 animate-fade-in-down">
-         <div className="flex items-center gap-3 bg-white/50 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm border border-white/60">
+         <div className="flex items-center gap-3">
             <div className="p-1.5 bg-blue-500 rounded-lg text-white shadow-md">
                 <img src="/favicon.svg" className="w-6 h-6" alt="logo" />
             </div>
