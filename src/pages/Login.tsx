@@ -145,7 +145,7 @@ const Login = () => {
               name="phone"
               type="text"
               required
-              className="block w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50/50 text-center text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900 focus:bg-white transition-all duration-300"
+              className="block w-full px-4 py-3.5 rounded-xl border border-black bg-gray-50/50 text-center text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900 focus:bg-white transition-all duration-300"
               placeholder="请输入手机号"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
@@ -159,7 +159,7 @@ const Login = () => {
               name="code"
               type="text"
               required
-              className="block w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-gray-50/50 text-center text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900 focus:bg-white transition-all duration-300 flex-1"
+              className="block w-full px-4 py-3.5 rounded-xl border border-black bg-gray-50/50 text-center text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/5 focus:border-gray-900 focus:bg-white transition-all duration-300 flex-1"
               placeholder="请输入验证码"
               value={code}
               onChange={(e) => setCode(e.target.value)}
@@ -168,7 +168,7 @@ const Login = () => {
                 type="button"
                 onClick={handleSendCode}
                 disabled={countdown > 0}
-                className="px-4 py-3.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap min-w-[120px]"
+                className="px-4 py-3.5 bg-white border border-black text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap min-w-[120px]"
             >
                 {countdown > 0 ? `${countdown}s` : '发送验证码'}
             </button>
