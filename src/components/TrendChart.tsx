@@ -5,6 +5,20 @@ import { format } from 'date-fns';
 interface TrendChartProps {
   data: any[];
   loading: boolean;
+  /**
+   * 导出模式
+   * 作用：用于 PDF 导出时的二次渲染，避免滚动容器影响布局，并关闭动画以保证截图稳定
+   * 输入：true/false
+   * 输出：渲染策略切换（容器样式、动画开关）
+   */
+  exportMode?: boolean;
+  /**
+   * 导出宽度（px）
+   * 作用：导出 PDF 时按页面宽度固定图表渲染宽度，避免 ResponsiveContainer 在离屏环境无法及时测量导致空白图
+   * 输入：像素宽度
+   * 输出：用于 X 轴刻度规划与图表实际绘制宽度
+   */
+  exportWidthPx?: number;
 }
 
 // 参数配置映射表：将后端字段映射为中文名称、单位和颜色
@@ -47,7 +61,7 @@ const PARAM_CONFIG: Record<string, { name: string; unit: string; color: string }
  *   3. 为每个参数渲染一个独立的折线图
  *   4. 所有折线图通过 syncId 保持交互同步（Tooltip同步）
  */
-const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
+const TrendChart: React.FC<TrendChartProps> = ({ data, loading, exportMode = false, exportWidthPx }) => {
   if (loading) {
     return <div className="h-full flex items-center justify-center text-gray-400">加载中...</div>;
   }
@@ -139,8 +153,8 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
   });
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto custom-scrollbar gap-8 pr-2 pb-4">
-      {activeKeys.map((key, index) => {
+    <div className={exportMode ? 'flex flex-col w-full gap-8' : 'flex flex-col h-full overflow-y-auto custom-scrollbar gap-8 pr-2 pb-4'}>
+      {activeKeys.map((key) => {
         const config = PARAM_CONFIG[key];
         
         // 过滤出该字段有值的数据
@@ -172,6 +186,8 @@ const TrendChart: React.FC<TrendChartProps> = ({ data, loading }) => {
             dataKey={key}
             domain={domain}
             yAxisWidth={yAxisWidth}
+            exportMode={exportMode}
+            exportWidthPx={exportWidthPx}
           />
         );
       })}
@@ -185,9 +201,19 @@ interface SingleChartProps {
   dataKey: string;
   domain: [number | 'auto', number | 'auto'];
   yAxisWidth: number;
+  /**
+   * 导出模式
+   * 作用：用于导出截图时关闭动画，避免截图时序导致的曲线/坐标未绘制完整
+   */
+  exportMode?: boolean;
+  /**
+   * 导出宽度（px）
+   * 作用：在导出模式下使用固定宽度渲染图表，确保横轴刻度间距与 PDF 页面一致
+   */
+  exportWidthPx?: number;
 }
 
-const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain, yAxisWidth }) => {
+const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain, yAxisWidth, exportMode = false, exportWidthPx }) => {
   const [hoverData, setHoverData] = React.useState<{ y: number, value: number } | null>(null);
   const [activeIndex, setActiveIndex] = React.useState<number>(-1);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -221,7 +247,8 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
     const times = (data || []).map((d) => d?.time).filter(Boolean) as string[];
     const uniqueTimes = Array.from(new Set(times));
     const count = uniqueTimes.length;
-    const safeWidth = Number.isFinite(containerWidth) ? containerWidth : 0;
+    const effectiveWidth = exportMode && exportWidthPx ? exportWidthPx : containerWidth;
+    const safeWidth = Number.isFinite(effectiveWidth) ? effectiveWidth : 0;
     const plotWidth = Math.max(0, safeWidth - (Math.max(0, yAxisWidth) + 24));
     const fontFamily =
       'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
@@ -307,7 +334,7 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
     }
 
     return resolve(candidates[candidates.length - 1]);
-  }, [containerWidth, data, yAxisWidth]);
+  }, [containerWidth, data, exportMode, exportWidthPx, yAxisWidth]);
 
   const CustomXAxisTick = React.useCallback((props: any) => {
     const { x, y, payload } = props;
@@ -452,15 +479,13 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
           </>
        )}
 
-       <ResponsiveContainer width="100%" height="100%">
-         <LineChart
-           data={data}
-           margin={{ top: 5, right: 44, left: 0, bottom: 18 }}
-           onMouseMove={handleMouseMove}
-           onMouseLeave={handleMouseLeave}
-           onTouchMove={handleMouseMove}
-           onTouchEnd={handleMouseLeave}
-         >
+       {exportMode && exportWidthPx ? (
+        <LineChart
+          width={exportWidthPx}
+          height={200}
+          data={data}
+          margin={{ top: 5, right: 44, left: 0, bottom: 18 }}
+        >
            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
            <XAxis 
               dataKey="time" 
@@ -490,20 +515,75 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
               cursor={{ strokeDasharray: '3 3', stroke: '#9ca3af' }}
            />
-           <Line
-             type="monotone"
-             dataKey={dataKey}
-             stroke={config.color}
-             strokeWidth={2}
-             dot={renderDot}
-             activeDot={false}
-             name={config.name}
-             unit={config.unit}
-             animationDuration={1000}
-             connectNulls={false} // 不连接断点
-           />
-         </LineChart>
-       </ResponsiveContainer>
+          <Line
+            type="monotone"
+            dataKey={dataKey}
+            stroke={config.color}
+            strokeWidth={2}
+            dot={renderDot}
+            activeDot={false}
+            name={config.name}
+            unit={config.unit}
+            isAnimationActive={!exportMode}
+            animationDuration={exportMode ? 0 : 1000}
+            connectNulls={false} // 不连接断点
+          />
+        </LineChart>
+       ) : (
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={data}
+            margin={{ top: 5, right: 44, left: 0, bottom: 18 }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            onTouchMove={handleMouseMove}
+            onTouchEnd={handleMouseLeave}
+          >
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+            <XAxis 
+              dataKey="time" 
+              ticks={tickPlan.ticks}
+              interval={0}
+              tick={CustomXAxisTick as any}
+              axisLine={{ stroke: '#e5e7eb' }}
+              tickLine={{ stroke: '#e5e7eb' }}
+              height={tickPlan.height}
+              padding={tickPlan.padding}
+              tickMargin={6}
+            />
+            <YAxis 
+              orientation="left" 
+              tick={{ fontSize: 12, fill: '#6b7280' }} 
+              axisLine={{ stroke: '#e5e7eb' }}
+              tickLine={{ stroke: '#e5e7eb' }}
+              domain={domain}
+              allowDataOverflow={false} 
+              tickFormatter={formatYAxisTick}
+              allowDecimals
+              width={yAxisWidth}
+            />
+            <Tooltip
+              trigger="hover"
+              labelFormatter={(label) => format(new Date(label), 'yyyy-MM-dd HH:mm:ss')}
+              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+              cursor={{ strokeDasharray: '3 3', stroke: '#9ca3af' }}
+            />
+            <Line
+              type="monotone"
+              dataKey={dataKey}
+              stroke={config.color}
+              strokeWidth={2}
+              dot={renderDot}
+              activeDot={false}
+              name={config.name}
+              unit={config.unit}
+              isAnimationActive={!exportMode}
+              animationDuration={exportMode ? 0 : 1000}
+              connectNulls={false} // 不连接断点
+            />
+          </LineChart>
+        </ResponsiveContainer>
+       )}
     </div>
   );
 };

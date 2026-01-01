@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { createRoot } from 'react-dom/client';
 import { ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { Pond, getPondDetail, getBreedingRecords, getTrendData, getFeedTrendData } from '@/services/ponds';
 import { GroupInfo, getGroupInfo, GroupUser } from '@/services/groups';
@@ -363,20 +364,57 @@ const PondDetail = () => {
   const handleExportTrendPdf = async () => {
     if (!id) return;
     if (exportingTrendPdf) return;
-    if (!trendExportRef.current) return;
     if (trendLoading) return;
     if (!trendData || trendData.length === 0) return;
 
     setExportingTrendPdf(true);
+    /**
+     * PDF 导出专用趋势图二次渲染容器
+     * 作用：按 PDF 页面宽度重新渲染趋势图，让横轴刻度间距按导出宽度重新计算，避免裁切/重叠
+     * 输入：trendData（趋势数据）、导出目标宽度（px）
+     * 输出：离屏渲染后的图表节点列表（用于后续分页截图）
+     */
+    const exportHost = document.createElement('div');
+    const exportRoot = createRoot(exportHost);
     try {
+      // A4 纵向宽度约为 595.28pt，浏览器 96dpi 下换算为 px：pt * 96 / 72
+      const exportWidthPx = Math.round((595.28 * 96) / 72);
+      exportHost.style.position = 'fixed';
+      exportHost.style.left = '-100000px';
+      exportHost.style.top = '0';
+      exportHost.style.width = `${exportWidthPx}px`;
+      exportHost.style.backgroundColor = '#ffffff';
+      exportHost.style.padding = '0';
+      exportHost.style.margin = '0';
+      exportHost.style.boxSizing = 'border-box';
+      exportHost.style.pointerEvents = 'none';
+      exportHost.style.zIndex = '-1';
+      document.body.appendChild(exportHost);
+
       const name = sanitizeFilenamePart(pond?.name || 'pond');
       const start = dateRange?.startDate ? format(dateRange.startDate, 'yyyyMMdd') : 'start';
       const end = dateRange?.endDate ? format(dateRange.endDate, 'yyyyMMdd') : 'end';
       const ts = fmt(new Date(), 'yyyyMMdd_HHmm');
       const filename = `${name}_${id}_${start}-${end}_智能养殖报告_${ts}.pdf`;
 
-      const el = trendExportRef.current;
-      const items = Array.from(el.querySelectorAll('[data-trend-export-item="true"]')) as HTMLElement[];
+      exportRoot.render(
+        <div style={{ width: `${exportWidthPx}px`, padding: '0', margin: '0' }}>
+          <TrendChart data={trendData} loading={false} exportMode exportWidthPx={exportWidthPx} />
+        </div>
+      );
+
+      const waitForCharts = async () => {
+        for (let i = 0; i < 30; i++) {
+          const nodes = exportHost.querySelectorAll('[data-trend-export-item="true"]');
+          const list = Array.from(nodes) as HTMLElement[];
+          const ready = list.length > 0 && list.every((n) => (n.getBoundingClientRect().width || 0) > 0);
+          if (ready) return list;
+          await new Promise<void>((resolve) => setTimeout(resolve, 50));
+        }
+        return Array.from(exportHost.querySelectorAll('[data-trend-export-item="true"]')) as HTMLElement[];
+      };
+
+      const items = await waitForCharts();
       const startText = dateRange?.startDate ? format(dateRange.startDate, 'yyyy-MM-dd') : '--';
       const endText = dateRange?.endDate ? format(dateRange.endDate, 'yyyy-MM-dd') : '--';
       const reportNo = `${fmt(new Date(), 'yyyyMMddHHmmssSSS')}${String(id).padStart(4, '0')}`;
@@ -388,8 +426,8 @@ const PondDetail = () => {
         marginPt: 0,
         itemsPerPage: ({ pageIndex }) => (pageIndex === 0 ? 3 : 4),
         ignoreSelector: '[data-export-ignore="true"]',
-        wrapperWidthPx: 780,
-        chartHeightPx: ({ pageIndex }) => (pageIndex === 0 ? 250 : 230),
+        wrapperWidthPx: exportWidthPx,
+        chartHeightPx: 0,
         watermarkText: '塘前燕数据验证中心',
         watermarkOpacity: 0.12,
         watermarkFontSizePx: 26,
@@ -539,6 +577,16 @@ const PondDetail = () => {
         },
       });
     } finally {
+      try {
+        exportRoot.unmount();
+      } catch {
+        // ignore
+      }
+      try {
+        exportHost.remove();
+      } catch {
+        // ignore
+      }
       setExportingTrendPdf(false);
     }
   };

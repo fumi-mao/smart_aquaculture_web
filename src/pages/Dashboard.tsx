@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Pond, getRecentWaterQuality } from '@/services/ponds';
+import { Pond, getWaterQualityByTimeRange } from '@/services/ponds';
 import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PondCard from '@/components/PondCard';
 import { fetchDisplayPonds } from '@/utils/pondLoader';
+import { formatApiDateTime } from '@/lib/utils';
 
 /**
  * 仪表盘页面 (Dashboard)
@@ -54,9 +55,24 @@ const Dashboard = () => {
     
     setLoadingWaterQuality(true);
     try {
+      // 近 7 日趋势预览：包含今天在内的 7 个自然日
+      const now = new Date();
+      const start = new Date(now);
+      start.setDate(start.getDate() - 6);
+      start.setHours(0, 0, 0, 0);
+
+      const startTime = formatApiDateTime(start);
+      const endTime = formatApiDateTime(now);
+
       // 创建并发请求任务
       const tasks = pondList.map(pond => 
-        getRecentWaterQuality(pond.id, 2)
+        getWaterQualityByTimeRange({
+          pond_id: pond.id,
+          start_time: startTime,
+          end_time: endTime,
+          page: 1,
+          page_size: 200,
+        })
           .then(res => ({ id: pond.id, data: res.data || [] }))
           .catch(err => {
             console.warn(`Failed to fetch water quality for pond ${pond.id}`, err);

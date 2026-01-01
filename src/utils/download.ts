@@ -1,3 +1,6 @@
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+
 export function downloadBase64File(filename: string, base64: string, mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
   const input = String(base64 || '').trim();
   const dataIdx = input.indexOf(',');
@@ -102,10 +105,6 @@ export async function downloadElementAsPdf({
   onClone,
 }: DownloadElementAsPdfOptions) {
   if (!element) return;
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-    import('html2canvas'),
-    import('jspdf'),
-  ]);
 
   const canvas = await html2canvas(element, {
     backgroundColor,
@@ -200,8 +199,8 @@ export async function downloadPagedElementsAsPdf({
   scale = 2,
   backgroundColor = '#ffffff',
   ignoreSelector,
-  wrapperWidthPx = 1200,
-  chartHeightPx = 260,
+  wrapperWidthPx = 780,
+  chartHeightPx = 0,
   watermarkText,
   watermarkOpacity = 0.12,
   watermarkRotateDeg = -25,
@@ -210,11 +209,6 @@ export async function downloadPagedElementsAsPdf({
 }: DownloadPagedElementsAsPdfOptions) {
   if (!elements || elements.length === 0) return;
   if (!itemsPerPage) return;
-
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-    import('html2canvas'),
-    import('jspdf'),
-  ]);
 
   const pdf = new jsPDF({ orientation, unit: 'pt', format });
   const pageWidth = pdf.internal.pageSize.getWidth();
@@ -233,7 +227,7 @@ export async function downloadPagedElementsAsPdf({
   const getChartHeightPx = (pageIndex: number) => {
     const n = typeof chartHeightPx === 'function' ? chartHeightPx({ pageIndex }) : chartHeightPx;
     const v = Number(n);
-    return Number.isFinite(v) && v >= 120 ? v : 260;
+    return Number.isFinite(v) && v >= 120 ? v : 0;
   };
 
   const pages: HTMLElement[][] = [];
@@ -250,7 +244,9 @@ export async function downloadPagedElementsAsPdf({
   for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
     const pageItems = pages[pageIndex] || [];
     if (pageItems.length === 0) continue;
-    const resolvedWrapperWidthPx = Math.min(980, Math.max(480, Math.round(wrapperWidthPx)));
+    const requestedWidthPx = Math.round(wrapperWidthPx);
+    const resolvedWrapperWidthPx = Math.min(980, Math.max(520, Number.isFinite(requestedWidthPx) ? requestedWidthPx : 780));
+    const sidePaddingPx = 14;
 
     const wrapper = document.createElement('div');
     wrapper.style.position = 'fixed';
@@ -258,13 +254,13 @@ export async function downloadPagedElementsAsPdf({
     wrapper.style.top = '0';
     wrapper.style.zIndex = '-1';
     wrapper.style.backgroundColor = backgroundColor;
-    wrapper.style.padding = '6px 10px';
+    wrapper.style.padding = `6px ${sidePaddingPx}px 12px ${sidePaddingPx}px`;
     wrapper.style.width = `${resolvedWrapperWidthPx}px`;
     wrapper.style.boxSizing = 'border-box';
     wrapper.style.display = 'flex';
     wrapper.style.flexDirection = 'column';
     wrapper.style.gap = '10px';
-    wrapper.style.overflow = 'hidden';
+    wrapper.style.overflow = 'visible';
     const minHeightPx = Math.max(1, Math.round(resolvedWrapperWidthPx * (contentHeight / contentWidth)));
     wrapper.style.minHeight = `${minHeightPx}px`;
 
@@ -341,24 +337,8 @@ export async function downloadPagedElementsAsPdf({
         const n = node as HTMLElement;
         n.style.minWidth = '0';
         n.style.width = '100%';
-        n.style.height = `${getChartHeightPx(pageIndex)}px`;
-      });
-      const chartSvgs = cloned.querySelectorAll('.recharts-wrapper svg');
-      chartSvgs.forEach((node) => {
-        const svg = node as SVGElement;
-        const wRaw = svg.getAttribute('width');
-        const hRaw = svg.getAttribute('height');
-        const w = wRaw ? Number.parseFloat(wRaw) : NaN;
-        const h = hRaw ? Number.parseFloat(hRaw) : NaN;
-        if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
-          if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-          if (!svg.getAttribute('preserveAspectRatio')) svg.setAttribute('preserveAspectRatio', 'xMinYMin meet');
-          svg.removeAttribute('width');
-          svg.removeAttribute('height');
-          (svg as any).style.width = '100%';
-          (svg as any).style.height = '100%';
-          (svg as any).style.display = 'block';
-        }
+        const h = getChartHeightPx(pageIndex);
+        if (h > 0) n.style.height = `${h}px`;
       });
       const titleRow = cloned.querySelector('[data-trend-title-row="true"]') as HTMLElement | null;
       if (titleRow) {

@@ -89,3 +89,22 @@ export const getRecentWaterQuality = async (pondId: number | string, limit: numb
   });
   return response.data;
 };
+
+/**
+ * 获取指定时间范围内的水质记录（用于首页卡片趋势预览）
+ * @param params 查询参数
+ * @returns 水质记录列表
+ */
+export const getWaterQualityByTimeRange = async (params: {
+  pond_id: number;
+  start_time: string;
+  end_time: string;
+  page?: number;
+  page_size?: number;
+}) => {
+  const response = await api.post('/query/timeline', {
+    ...params,
+    type: ['waterquality_data'],
+  });
+  return response.data;
+};
