@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginByPhone, sendSms } from '@/services/auth';
 import { useUserStore } from '@/store/useUserStore';
-import { Loader2, Headphones } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import ParticleBackground from '@/components/ParticleBackground';
 
 /**
@@ -20,6 +20,9 @@ const Login = () => {
   const [countdown, setCountdown] = useState(0); // 倒计时
   const [loading, setLoading] = useState(false); // 加载状态
   const [error, setError] = useState(''); // 错误信息
+  const [isAgreed, setIsAgreed] = useState(false);
+  const [showAgreementPopup, setShowAgreementPopup] = useState(false);
+  const [pendingAction, setPendingAction] = useState<null | 'sendCode'>(null);
   
   const navigate = useNavigate();
   const { setToken, setUser } = useUserStore();
@@ -42,7 +45,7 @@ const Login = () => {
    * 2. 调用后端接口发送验证码
    * 3. 启动倒计时
    */
-  const handleSendCode = async () => {
+  const sendCodeInternal = async () => {
     setError('');
     // 基础非空验证
     if (!phone) {
@@ -64,6 +67,34 @@ const Login = () => {
       setError(err.message || '发送验证码失败');
     }
   };
+
+  const handleSendCode = async () => {
+    if (!isAgreed) {
+      setPendingAction('sendCode');
+      setShowAgreementPopup(true);
+      return;
+    }
+    await sendCodeInternal();
+  };
+
+  const handleAgreementCancel = () => {
+    setShowAgreementPopup(false);
+    setPendingAction(null);
+  };
+
+  const handleAgreementConfirm = async () => {
+    const action = pendingAction;
+    setIsAgreed(true);
+    setShowAgreementPopup(false);
+    setPendingAction(null);
+
+    if (action === 'sendCode') {
+      await sendCodeInternal();
+    }
+  };
+
+  const openUserAgreement = () => navigate('/legal/user-agreement');
+  const openPrivacyPolicy = () => navigate('/legal/privacy-policy');
 
   /**
    * 处理登录逻辑
@@ -194,14 +225,95 @@ const Login = () => {
       </div>
       
       {/* Footer Text */}
-      <div className="z-10 mt-8 text-xs text-gray-400 text-center tracking-wide">
-        登录即表示您已阅读并同意 <span className="text-gray-500 hover:text-gray-800 underline cursor-pointer transition-colors">用户协议</span> 和 <span className="text-gray-500 hover:text-gray-800 underline cursor-pointer transition-colors">隐私政策</span>
+      <div className="z-10 mt-8 flex flex-col items-center gap-3 text-xs text-gray-400 text-center tracking-wide px-6">
+        <div className="flex items-start gap-2 text-gray-500">
+          <input
+            type="checkbox"
+            checked={isAgreed}
+            onChange={(e) => setIsAgreed(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+          />
+          <div className="leading-5">
+            <span>我已阅读并同意</span>{' '}
+            <span
+              className="text-blue-600 hover:text-blue-800 underline cursor-pointer transition-colors"
+              onClick={openUserAgreement}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') openUserAgreement();
+              }}
+            >
+              《用户协议》
+            </span>{' '}
+            <span>和</span>{' '}
+            <span
+              className="text-blue-600 hover:text-blue-800 underline cursor-pointer transition-colors"
+              onClick={openPrivacyPolicy}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') openPrivacyPolicy();
+              }}
+            >
+              《隐私政策》
+            </span>
+          </div>
+        </div>
+        <div>未注册用户登录后将自动注册账号</div>
       </div>
 
-      {/* Headset Icon */}
-      <div className="absolute bottom-8 right-8 z-20 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center cursor-pointer hover:scale-110 hover:shadow-xl transition-all duration-300 text-gray-600 hover:text-blue-600 border border-gray-100">
-         <Headphones size={22} />
-      </div>
+      {showAgreementPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden">
+            <div className="px-8 pt-8 pb-6 text-center">
+              <div className="text-lg font-semibold text-gray-900">请阅读并同意以下条款</div>
+              <div className="mt-4 text-sm text-gray-600">
+                <span>我已阅读并同意</span>{' '}
+                <span
+                  className="text-blue-600 hover:text-blue-800 underline cursor-pointer transition-colors"
+                  onClick={openUserAgreement}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') openUserAgreement();
+                  }}
+                >
+                  《用户协议》
+                </span>{' '}
+                <span>和</span>{' '}
+                <span
+                  className="text-blue-600 hover:text-blue-800 underline cursor-pointer transition-colors"
+                  onClick={openPrivacyPolicy}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') openPrivacyPolicy();
+                  }}
+                >
+                  《隐私政策》
+                </span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 px-8 pb-8">
+              <button
+                type="button"
+                onClick={handleAgreementCancel}
+                className="h-11 rounded-xl bg-gray-100 text-gray-700 font-medium hover:bg-gray-200 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleAgreementConfirm}
+                className="h-11 rounded-xl bg-[#48bcf6] text-white font-medium hover:bg-[#2fa8e6] transition-colors"
+              >
+                同意
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
