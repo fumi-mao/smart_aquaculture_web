@@ -215,13 +215,8 @@ interface SingleChartProps {
 
 const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain, yAxisWidth, exportMode = false, exportWidthPx }) => {
   const [hoverData, setHoverData] = React.useState<{ y: number, value: number } | null>(null);
-  const [activeIndex, setActiveIndex] = React.useState<number>(-1);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = React.useState<number>(0);
-
-  React.useEffect(() => {
-    setActiveIndex(-1);
-  }, [data]);
 
   React.useEffect(() => {
     const el = containerRef.current;
@@ -418,33 +413,55 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
        
        setHoverData({ y, value });
     }
-    if (e && typeof e.activeTooltipIndex === 'number' && !isNaN(e.activeTooltipIndex)) {
-      setActiveIndex(e.activeTooltipIndex);
-    }
   };
 
   const handleMouseLeave = () => {
     setHoverData(null);
-    setActiveIndex(-1);
   };
 
+  /**
+   * 数据点样式
+   * 作用：折线上的每个数据点默认渲染为空心圆，便于与背景区分且不遮挡折线本身。
+   * 输入：Recharts Dot Props（包含 cx/cy 等坐标信息）
+   * 输出：SVG circle
+   * 交互说明：
+   *  - 强调态（hover/tooltip 激活）不在此处处理，由 activeDot 统一渲染为实心圆覆盖在空心圆之上
+   */
   const renderDot = React.useCallback((props: any) => {
-    const { cx, cy, index } = props;
+    const { cx, cy } = props;
     if (cx == null || cy == null) return null;
-    const isActive = activeIndex >= 0 && index === activeIndex;
-    const r = isActive ? 4 : 3;
-    const fill = isActive ? config.color : '#ffffff';
     return (
       <circle
         cx={cx}
         cy={cy}
-        r={r}
+        r={3}
         stroke={config.color}
         strokeWidth={2}
-        fill={fill}
+        fill="#ffffff"
       />
     );
-  }, [activeIndex, config.color]);
+  }, [config.color]);
+
+  /**
+   * 数据点强调态样式（hover）
+   * 作用：当鼠标移动到数据点附近、Tooltip 触发时，将当前数据点从空心变为实心，符合交互预期。
+   * 输入：Recharts ActiveDot Props（包含 cx/cy 等坐标信息）
+   * 输出：SVG circle（覆盖在普通 dot 之上）
+   */
+  const renderActiveDot = React.useCallback((props: any) => {
+    const { cx, cy } = props;
+    if (cx == null || cy == null) return null;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={4}
+        stroke={config.color}
+        strokeWidth={2}
+        fill={config.color}
+      />
+    );
+  }, [config.color]);
 
   return (
     <div 
@@ -574,7 +591,7 @@ const SingleChart: React.FC<SingleChartProps> = ({ config, data, dataKey, domain
               stroke={config.color}
               strokeWidth={2}
               dot={renderDot}
-              activeDot={false}
+              activeDot={renderActiveDot}
               name={config.name}
               unit={config.unit}
               isAnimationActive={!exportMode}
