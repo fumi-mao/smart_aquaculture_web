@@ -1,0 +1,31 @@
+server {
+    listen 80;
+    # 请替换为您的域名或服务器IP
+    server_name 10.10.10.107;
+
+    # 指向构建后的 dist 目录
+    root /var/www/smart_aquaculture_web/dist;
+    index index.html;
+
+    # 处理前端路由 (SPA)
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 代理 API 请求 (对应 vite.config.ts 中的配置)
+    location /api {
+        proxy_pass https://api.pondrobotics.com;
+        proxy_set_header Host api.pondrobotics.com;
+        proxy_ssl_server_name on;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /oauth {
+        proxy_pass https://api.pondrobotics.com;
+        proxy_set_header Host api.pondrobotics.com;
+        proxy_ssl_server_name on;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}

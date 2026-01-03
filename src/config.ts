@@ -4,7 +4,7 @@
  */
 
 // ================= 环境配置 =================
-export const ENV: 'dev' | 'test' | 'prod' = 'dev'; // 当前环境
+export const ENV: 'dev' | 'test' | 'prod' = 'prod'; // 当前环境
 
 // ================= 服务器配置 =================
 export const API_BASE_URL = '/api/v1';
